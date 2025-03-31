@@ -96,6 +96,10 @@ def process_query_default(client, input_data, is_text=False):
             temperature=0.7,
         )
         
+        # Handle empty response or null content
+        if not response or not response.choices or not response.choices[0].message.content:
+            return transcript, "Lo siento, no pude generar una respuesta. Por favor intenta reformular tu pregunta."
+        
         return transcript, response.choices[0].message.content
     except Exception as e:
         logger.error(f"Error processing query with default agent: {e}")
@@ -131,13 +135,27 @@ def process_query_with_web_search(client, input_data, is_text=False):
                 "type": "function",
                 "function": {
                     "name": "web_search",
-                    "description": "Search the web for information on a given query. Use this when you need to find up-to-date information."
+                    "description": "Search the web for information on a given query. Use this when you need to find up-to-date information.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "query": {
+                                "type": "string", 
+                                "description": "The search query"
+                            }
+                        },
+                        "required": ["query"]
+                    }
                 }
             }],
             tool_choice="auto",
             temperature=0.7,
         )
         
+        # Handle empty response
+        if not response or not response.choices or not response.choices[0].message.content:
+            return transcript, "Lo siento, no pude encontrar información sobre ese tema. Por favor intenta con otra búsqueda."
+            
         return transcript, response.choices[0].message.content
     except Exception as e:
         logger.error(f"Error processing query with web search: {e}")

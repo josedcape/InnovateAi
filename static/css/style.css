@@ -93,6 +93,29 @@ button {
     transition: opacity 0.3s ease;
 }
 
+.avatar-placeholder {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: rgba(30, 30, 40, 0.8);
+    border-radius: var(--radius-md);
+}
+
+.avatar-placeholder-text {
+    font-size: 2rem;
+    font-weight: bold;
+    color: var(--primary-color);
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    text-shadow: 0 0 10px rgba(99, 102, 241, 0.5);
+}
+
 .avatar-active {
     border: 2px solid var(--primary-color);
     box-shadow: 0 0 15px rgba(99, 102, 241, 0.4);

@@ -123,6 +123,12 @@ def text_to_speech_gtts(text, lang='en'):
     Returns the path to the generated audio file
     """
     try:
+        # Verify that we have text to speak
+        if not text or text.strip() == '':
+            logger.error("Empty text provided for speech conversion")
+            # Use default error message instead of failing
+            text = "Lo siento, hubo un problema al generar una respuesta de voz."
+        
         # Create a unique filename
         filename = f"{uuid.uuid4()}.mp3"
         file_path = os.path.join(AUDIO_FOLDER, filename)
@@ -138,7 +144,18 @@ def text_to_speech_gtts(text, lang='en'):
     
     except Exception as e:
         logger.error(f"Error using gTTS: {e}")
-        raise Exception(f"Failed to convert text to speech: {e}")
+        # Create a fallback error message audio instead of raising exception
+        try:
+            error_filename = f"error_{uuid.uuid4()}.mp3"
+            error_file_path = os.path.join(AUDIO_FOLDER, error_filename)
+            os.makedirs(os.path.dirname(error_file_path), exist_ok=True)
+            
+            error_tts = gTTS(text="Lo siento, hubo un problema al convertir el texto a voz.", lang=lang)
+            error_tts.save(error_file_path)
+            return error_file_path
+        except:
+            # If even the error message fails, then we raise the original exception
+            raise Exception(f"Failed to convert text to speech: {e}")
 
 
 def text_to_speech(text, language='en', voice=None):
@@ -146,6 +163,11 @@ def text_to_speech(text, language='en', voice=None):
     Main entry point for text-to-speech conversion
     Tries enhanced Google Cloud TTS first, falls back to gTTS
     """
+    # Check if text is empty or None
+    if not text or text.strip() == '':
+        logger.error("Empty text provided to text_to_speech")
+        text = "Lo siento, hubo un problema al generar una respuesta."
+    
     # Try Google Cloud TTS first for better quality
     voice_to_use = voice if voice else 'en-US-Neural2-F'
     tts_file_path = get_google_tts_enhanced(text, language=language, voice=voice_to_use)

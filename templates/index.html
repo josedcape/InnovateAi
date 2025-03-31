@@ -14,9 +14,11 @@
         <!-- Avatar Section -->
         <section class="avatar-section">
             <div class="avatar-container">
-                <video id="avatar-video" class="avatar-video" muted>
-                    <source src="{{ url_for('static', filename='assets/innovate.mp4') }}" type="video/mp4">
-                    Your browser does not support the video tag.
+                <video id="avatar-video" class="avatar-video" loop muted>
+                    <source src="{{ url_for('static', filename='assets/videos/innovate.mp4') }}" type="video/mp4">
+                    <div class="avatar-placeholder">
+                        <div class="avatar-placeholder-text">AI Assistant</div>
+                    </div>
                 </video>
                 <div class="futuristic-glow"></div>
             </div>
