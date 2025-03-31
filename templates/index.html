@@ -73,6 +73,15 @@
                     </svg>
                 </button>
 
+                <div class="text-input-container">
+                    <input type="text" id="text-input" class="text-input" placeholder="Escribe tu mensaje o presiona el micrófono para hablar...">
+                    <button id="send-button" class="send-button">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white" width="20" height="20">
+                            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path>
+                        </svg>
+                    </button>
+                </div>
+
                 <div class="visualization-container">
                     <div class="visualization-bars"></div>
                     <div class="loading-indicator">
@@ -82,6 +91,7 @@
                 </div>
                 
                 <div class="status-message">Ready</div>
+                <div class="countdown-timer hidden">5</div>
             </div>
         </section>
     </div>

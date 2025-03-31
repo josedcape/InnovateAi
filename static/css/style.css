@@ -335,6 +335,70 @@ button {
     align-items: center;
     gap: 0.5rem;
     background-color: var(--dark-surface);
+    flex-wrap: wrap;
+}
+
+.text-input-container {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    background-color: var(--dark-bg);
+    border-radius: var(--radius-md);
+    padding: 0 0.5rem;
+    height: 48px;
+    overflow: hidden;
+}
+
+.text-input {
+    flex: 1;
+    background: none;
+    border: none;
+    outline: none;
+    color: var(--light-text);
+    font-family: inherit;
+    font-size: 1rem;
+    padding: 0.5rem;
+    height: 100%;
+}
+
+.text-input::placeholder {
+    color: var(--muted-text);
+}
+
+.send-button {
+    background-color: var(--primary-color);
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.send-button:hover {
+    background-color: var(--primary-dark);
+}
+
+.countdown-timer {
+    position: absolute;
+    bottom: 1rem;
+    right: 1rem;
+    background-color: var(--primary-color);
+    color: white;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+    animation: pulse 1s infinite;
+}
+
+.hidden {
+    display: none;
 }
 
 .record-button {
@@ -378,7 +442,7 @@ button {
 }
 
 .visualization-container {
-    flex: 1;
+    width: 100%;
     height: 48px;
     background-color: var(--dark-bg);
     border-radius: var(--radius-md);
@@ -386,6 +450,7 @@ button {
     display: flex;
     align-items: center;
     justify-content: center;
+    margin-top: 0.5rem;
 }
 
 .visualization-bars {

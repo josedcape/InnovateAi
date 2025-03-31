@@ -84,62 +84,108 @@ def serve_audio(filename):
 @app.route('/api/speech', methods=['POST'])
 def process_speech():
     """Process speech audio from the client"""
-    if 'audio' not in request.files:
-        return jsonify({'error': 'No audio file provided'}), 400
-    
-    audio_file = request.files['audio']
-    
-    if audio_file.filename == '':
-        return jsonify({'error': 'Empty file provided'}), 400
-    
-    # Get the agent type from the request
-    agent_type_str = request.form.get('agent_type', 'default')
-    try:
-        agent_type = AgentType(agent_type_str)
-    except ValueError:
-        agent_type = AgentType.DEFAULT
-    
-    # Save the audio file
-    audio_path = save_audio_file(audio_file)
-    
     # Create OpenAI client
     client = create_openai_client()
     
-    # Process based on agent type
-    try:
-        if agent_type == AgentType.WEB_SEARCH:
-            # Process with web search
-            transcript, response = process_query_with_web_search(client, audio_path)
-        elif agent_type == AgentType.COMPUTER_USE:
-            # Process with computer use
-            transcript, response = process_query_with_computer_use(client, audio_path)
-        elif agent_type == AgentType.FILE_SEARCH:
-            # Get vector store ID if available
-            vector_store_id = get_stored_vector_store_id()
-            # Process with file search
-            transcript, response = process_query_with_file_search(client, audio_path, vector_store_id)
-        else:
-            # Default processing
-            transcript, response = process_query_default(client, audio_path)
+    # Handle text input
+    if request.json and 'text' in request.json:
+        text_query = request.json['text']
+        agent_type_str = request.json.get('agent_type', 'default')
         
-        # Convert response text to speech
-        # Detect language for better TTS
-        detected_lang = detect_language(client, response)
+        try:
+            agent_type = AgentType(agent_type_str)
+        except ValueError:
+            agent_type = AgentType.DEFAULT
         
-        # Generate speech with appropriate language
-        audio_path = text_to_speech(response, language=detected_lang)
+        # Process based on agent type without transcription
+        try:
+            if agent_type == AgentType.WEB_SEARCH:
+                # Process with web search (creating a dummy transcript since we already have text)
+                _, response = process_query_with_web_search(client, text_query, is_text=True)
+            elif agent_type == AgentType.COMPUTER_USE:
+                # Process with computer use
+                _, response = process_query_with_computer_use(client, text_query, is_text=True)
+            elif agent_type == AgentType.FILE_SEARCH:
+                # Get vector store ID if available
+                vector_store_id = get_stored_vector_store_id()
+                # Process with file search
+                _, response = process_query_with_file_search(client, text_query, vector_store_id, is_text=True)
+            else:
+                # Default processing
+                _, response = process_query_default(client, text_query, is_text=True)
+            
+            # Detect language for better TTS
+            detected_lang = detect_language(client, response)
+            
+            # Generate speech with appropriate language
+            audio_path = text_to_speech(response, language=detected_lang)
+            
+            # Extract just the filename from the path
+            audio_filename = os.path.basename(audio_path)
+            
+            return jsonify({
+                'transcript': text_query,  # Just use the original text
+                'response': response,
+                'audio_url': f'/audio/{audio_filename}'
+            })
         
-        # Extract just the filename from the path
-        audio_filename = os.path.basename(audio_path)
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+            
+    # Handle audio input
+    elif 'audio' in request.files:
+        audio_file = request.files['audio']
         
-        return jsonify({
-            'transcript': transcript,
-            'response': response,
-            'audio_url': f'/audio/{audio_filename}'
-        })
+        if audio_file.filename == '':
+            return jsonify({'error': 'Empty file provided'}), 400
+        
+        # Get the agent type from the request
+        agent_type_str = request.form.get('agent_type', 'default')
+        try:
+            agent_type = AgentType(agent_type_str)
+        except ValueError:
+            agent_type = AgentType.DEFAULT
+        
+        # Save the audio file
+        audio_path = save_audio_file(audio_file)
+        
+        # Process based on agent type
+        try:
+            if agent_type == AgentType.WEB_SEARCH:
+                # Process with web search
+                transcript, response = process_query_with_web_search(client, audio_path)
+            elif agent_type == AgentType.COMPUTER_USE:
+                # Process with computer use
+                transcript, response = process_query_with_computer_use(client, audio_path)
+            elif agent_type == AgentType.FILE_SEARCH:
+                # Get vector store ID if available
+                vector_store_id = get_stored_vector_store_id()
+                # Process with file search
+                transcript, response = process_query_with_file_search(client, audio_path, vector_store_id)
+            else:
+                # Default processing
+                transcript, response = process_query_default(client, audio_path)
+            
+            # Detect language for better TTS
+            detected_lang = detect_language(client, response)
+            
+            # Generate speech with appropriate language
+            audio_path = text_to_speech(response, language=detected_lang)
+            
+            # Extract just the filename from the path
+            audio_filename = os.path.basename(audio_path)
+            
+            return jsonify({
+                'transcript': transcript,
+                'response': response,
+                'audio_url': f'/audio/{audio_filename}'
+            })
+        
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
     
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    else:
+        return jsonify({'error': 'No input provided (neither text nor audio)'}), 400
 
 
 @app.route('/api/upload-file', methods=['POST'])

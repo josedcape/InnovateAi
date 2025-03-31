@@ -12,6 +12,23 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialize UI
     initializeUI();
     
+    // Initialize text input
+    const textInput = document.getElementById('text-input');
+    const sendButton = document.getElementById('send-button');
+    
+    if (textInput && sendButton) {
+        // Send on Enter key press
+        textInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendTextMessage();
+            }
+        });
+        
+        // Send on button click
+        sendButton.addEventListener('click', sendTextMessage);
+    }
+    
     /**
      * Initialize the user interface and components
      */
@@ -151,46 +168,62 @@ document.addEventListener('DOMContentLoaded', function() {
         const selectedTool = aiTools.getCurrentTool();
         formData.append('agent_type', selectedTool);
         
-        // Send the audio to the server
-        fetch('/api/speech', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            // Hide loading indicator
-            loadingIndicator.style.display = 'none';
+        // Start a 5-second countdown before sending to assistant
+        const countdownTimer = document.querySelector('.countdown-timer');
+        countdownTimer.textContent = '5';
+        countdownTimer.classList.remove('hidden');
+        
+        let countdown = 5;
+        const countdownInterval = setInterval(() => {
+            countdown--;
+            countdownTimer.textContent = countdown;
             
-            // Update status
-            statusMessage.textContent = 'Ready';
-            
-            if (data.error) {
-                console.error('Error processing speech:', data.error);
-                addSystemMessage(`Error: ${data.error}`);
-                return;
+            if (countdown <= 0) {
+                clearInterval(countdownInterval);
+                countdownTimer.classList.add('hidden');
+                
+                // Send the audio to the server
+                fetch('/api/speech', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // Hide loading indicator
+                    loadingIndicator.style.display = 'none';
+                    
+                    // Update status
+                    statusMessage.textContent = 'Ready';
+                    
+                    if (data.error) {
+                        console.error('Error processing speech:', data.error);
+                        addSystemMessage(`Error: ${data.error}`);
+                        return;
+                    }
+                    
+                    // Update user message with transcription
+                    updateUserMessage(messageId, data.transcript);
+                    
+                    // Add AI response
+                    addAIMessage(data.response, new Date());
+                    
+                    // Play audio response
+                    if (data.audio_url) {
+                        playAudioResponse(data.audio_url);
+                    }
+                })
+                .catch(error => {
+                    // Hide loading indicator
+                    loadingIndicator.style.display = 'none';
+                    
+                    // Update status
+                    statusMessage.textContent = 'Ready';
+                    
+                    console.error('Error sending audio to server:', error);
+                    addSystemMessage('Error communicating with the server. Please try again.');
+                });
             }
-            
-            // Update user message with transcription
-            updateUserMessage(messageId, data.transcript);
-            
-            // Add AI response
-            addAIMessage(data.response, new Date());
-            
-            // Play audio response
-            if (data.audio_url) {
-                playAudioResponse(data.audio_url);
-            }
-        })
-        .catch(error => {
-            // Hide loading indicator
-            loadingIndicator.style.display = 'none';
-            
-            // Update status
-            statusMessage.textContent = 'Ready';
-            
-            console.error('Error sending audio to server:', error);
-            addSystemMessage('Error communicating with the server. Please try again.');
-        });
+        }, 1000);
     }
     
     /**
@@ -406,6 +439,75 @@ document.addEventListener('DOMContentLoaded', function() {
         if (conversationContainer) {
             conversationContainer.scrollTop = conversationContainer.scrollHeight;
         }
+    }
+    
+    /**
+     * Send a text message
+     */
+    function sendTextMessage() {
+        const textInput = document.getElementById('text-input');
+        const text = textInput.value.trim();
+        
+        if (!text) return;
+        
+        // Clear input field
+        textInput.value = '';
+        
+        // Add user message to conversation
+        const messageId = 'msg-' + Date.now();
+        addUserMessage(text, messageId, new Date());
+        
+        // Show loading indicator
+        const loadingIndicator = document.querySelector('.loading-indicator');
+        loadingIndicator.style.display = 'flex';
+        
+        // Update status message
+        const statusMessage = document.querySelector('.status-message');
+        statusMessage.textContent = 'Processing your message...';
+        
+        // Send the text to the server
+        fetch('/api/speech', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                text: text,
+                agent_type: aiTools.getCurrentTool()
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            // Hide loading indicator
+            loadingIndicator.style.display = 'none';
+            
+            // Update status
+            statusMessage.textContent = 'Ready';
+            
+            if (data.error) {
+                console.error('Error processing text:', data.error);
+                addSystemMessage(`Error: ${data.error}`);
+                return;
+            }
+            
+            // Add AI response
+            addAIMessage(data.response, new Date());
+            
+            // Play audio response
+            if (data.audio_url) {
+                playAudioResponse(data.audio_url);
+            }
+        })
+        .catch(error => {
+            // Hide loading indicator
+            loadingIndicator.style.display = 'none';
+            
+            // Update status
+            statusMessage.textContent = 'Ready';
+            
+            console.error('Error sending text to server:', error);
+            addSystemMessage('Error communicating with the server. Please try again.');
+        });
     }
     
     /**

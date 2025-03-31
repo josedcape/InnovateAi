@@ -70,11 +70,15 @@ def detect_language(client, text_sample):
         return "en"  # Default to English on failure
 
 
-def process_query_default(client, audio_path):
+def process_query_default(client, input_data, is_text=False):
     """Process a query using standard conversation capabilities"""
     try:
-        # Transcribe audio to text
-        transcript = transcribe_audio(client, audio_path)
+        # Handle text input
+        if is_text:
+            transcript = input_data  # Already have the text
+        else:
+            # Transcribe audio to text
+            transcript = transcribe_audio(client, input_data)
         
         # Process with GPT-4o
         response = client.chat.completions.create(
@@ -98,11 +102,15 @@ def process_query_default(client, audio_path):
         raise Exception(f"Failed to process query: {e}")
 
 
-def process_query_with_web_search(client, audio_path):
+def process_query_with_web_search(client, input_data, is_text=False):
     """Process a query using web search capabilities"""
     try:
-        # Transcribe audio to text
-        transcript = transcribe_audio(client, audio_path)
+        # Handle text input
+        if is_text:
+            transcript = input_data  # Already have the text
+        else:
+            # Transcribe audio to text
+            transcript = transcribe_audio(client, input_data)
         
         # Process with web search assistant
         response = client.chat.completions.create(
@@ -129,11 +137,15 @@ def process_query_with_web_search(client, audio_path):
         raise Exception(f"Failed to process query with web search: {e}")
 
 
-def process_query_with_computer_use(client, audio_path):
+def process_query_with_computer_use(client, input_data, is_text=False):
     """Process a query using computer use capabilities"""
     try:
-        # Transcribe audio to text
-        transcript = transcribe_audio(client, audio_path)
+        # Handle text input
+        if is_text:
+            transcript = input_data  # Already have the text
+        else:
+            # Transcribe audio to text
+            transcript = transcribe_audio(client, input_data)
         
         # Process with computer use assistant
         response = client.chat.completions.create(
@@ -161,11 +173,15 @@ def process_query_with_computer_use(client, audio_path):
         raise Exception(f"Failed to process query with computer use: {e}")
 
 
-def process_query_with_file_search(client, audio_path, vector_store_id=None):
+def process_query_with_file_search(client, input_data, vector_store_id=None, is_text=False):
     """Process a query using file search capabilities"""
     try:
-        # Transcribe audio to text
-        transcript = transcribe_audio(client, audio_path)
+        # Handle text input
+        if is_text:
+            transcript = input_data  # Already have the text
+        else:
+            # Transcribe audio to text
+            transcript = transcribe_audio(client, input_data)
         
         if not vector_store_id:
             return transcript, "I don't have any files to search through yet. Please upload some files first."
