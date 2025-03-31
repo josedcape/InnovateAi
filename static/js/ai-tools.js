@@ -58,8 +58,22 @@ class AITools {
                 toolButton.classList.add('active');
             }
             
+            // Use Font Awesome icons instead of SVG images
+            let iconClass = 'fas fa-robot'; // Default icon
+            
+            // Set specific icons based on tool type
+            if (tool.type === 'web_search') {
+                iconClass = 'fas fa-search-plus';
+            } else if (tool.type === 'computer_use') {
+                iconClass = 'fas fa-laptop-code';
+            } else if (tool.type === 'file_search') {
+                iconClass = 'fas fa-file-search';
+            } else if (tool.type === 'default') {
+                iconClass = 'fas fa-robot';
+            }
+            
             toolButton.innerHTML = `
-                <img src="${tool.icon}" alt="${tool.name}" class="tool-icon">
+                <i class="${iconClass} tool-icon"></i>
                 <span class="tool-label">${tool.name}</span>
             `;
             

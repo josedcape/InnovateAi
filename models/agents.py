@@ -44,24 +44,24 @@ def get_all_agents():
     """Return all available agents"""
     return [
         Agent(
-            name="Standard Assistant",
+            name="Assistant IA",
             agent_type=AgentType.DEFAULT,
-            description="General-purpose AI assistant with conversation capabilities"
+            description="Asistente de IA de propósito general con capacidades de conversación"
         ),
         Agent(
-            name="Web Search Assistant",
+            name="Búsqueda Web",
             agent_type=AgentType.WEB_SEARCH,
-            description="AI assistant that can search the web for the latest information"
+            description="Asistente de IA que puede buscar en la web la información más reciente"
         ),
         Agent(
-            name="Computer Use Assistant",
+            name="Uso de Computadora",
             agent_type=AgentType.COMPUTER_USE,
-            description="AI assistant that can perform tasks on your computer"
+            description="Asistente de IA que puede realizar tareas en tu computadora"
         ),
         Agent(
-            name="File Search Assistant",
+            name="Búsqueda de Archivos",
             agent_type=AgentType.FILE_SEARCH,
-            description="AI assistant that can search through your uploaded documents"
+            description="Asistente de IA que puede buscar en tus documentos subidos"
         )
     ]
 

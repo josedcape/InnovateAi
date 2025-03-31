@@ -468,9 +468,27 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     /**
-     * Copy text to clipboard
+     * Copy text to clipboard using modern API when available
      */
     function copyToClipboard(text) {
+        // Use modern navigator.clipboard API if available
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text)
+                .catch(err => {
+                    console.error('Failed to copy text with Clipboard API:', err);
+                    // Fall back to execCommand method
+                    fallbackCopyToClipboard(text);
+                });
+        } else {
+            // Fall back to older method
+            fallbackCopyToClipboard(text);
+        }
+    }
+    
+    /**
+     * Fallback method for copying to clipboard
+     */
+    function fallbackCopyToClipboard(text) {
         // Create a temporary textarea element
         const textarea = document.createElement('textarea');
         textarea.value = text;
