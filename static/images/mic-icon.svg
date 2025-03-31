@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+  <!-- Microphone Icon with Pulse Animation -->
+  <g fill="none" stroke="#3498db" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Microphone Body -->
+    <path d="M12,1.5 v13" class="mic-line"/>
+    <path d="M8,5.5 v6 c0,2.2,1.8,4,4,4 s4-1.8,4-4 v-6" class="mic-body"/>
+    
+    <!-- Stand -->
+    <path d="M5,11.5 c0,3.9,3.1,7,7,7 s7-3.1,7-7" class="mic-stand"/>
+    
+    <!-- Base -->
+    <path d="M12,18.5 v4" class="mic-base"/>
+    <path d="M8,22.5 h8" class="mic-base-line"/>
+  
+    <!-- Pulse Wave Circles (CSS will animate these) -->
+    <circle cx="12" cy="8.5" r="6" class="mic-wave"/>
+  </g>
+  
+  <style>
+    .mic-wave {
+      opacity: 0;
+      transform-origin: center;
+      animation: wave 2s infinite;
+    }
+    
+    @keyframes wave {
+      0% { opacity: 0.7; transform: scale(0.1); }
+      50% { opacity: 0.3; }
+      100% { opacity: 0; transform: scale(2); }
+    }
+  </style>
+</svg>

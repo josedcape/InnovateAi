@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <!-- Background Circle with Gradient -->
+  <circle cx="50" cy="50" r="48" fill="url(#grad1)" />
+  
+  <!-- Outer Ring -->
+  <circle cx="50" cy="50" r="45" fill="none" stroke="#3498db" stroke-width="2" stroke-dasharray="8 4" />
+  
+  <!-- Inner Brain Shape -->
+  <path d="M65,36c0-8.28-6.72-15-15-15s-15,6.72-15,15c0,3.35,1.1,6.44,2.96,8.94
+          C33.34,48.03,31,53.38,31,59.5C31,70.27,39.73,79,50.5,79S70,70.27,70,59.5c0-6.12-2.34-11.47-5.96-15.56
+          C63.9,42.44,65,39.35,65,36z" fill="#16a085" />
+  
+  <!-- Circuit Lines -->
+  <path d="M40,45h20M30,50h40M35,55h30M40,60h20M45,65h10" 
+        stroke="#ecf0f1" stroke-width="1.5" stroke-linecap="round" fill="none" />
+  
+  <!-- Connection Points -->
+  <circle cx="40" cy="45" r="2" fill="#3498db" />
+  <circle cx="60" cy="45" r="2" fill="#3498db" />
+  <circle cx="30" cy="50" r="2" fill="#3498db" />
+  <circle cx="70" cy="50" r="2" fill="#3498db" />
+  <circle cx="35" cy="55" r="2" fill="#3498db" />
+  <circle cx="65" cy="55" r="2" fill="#3498db" />
+  <circle cx="40" cy="60" r="2" fill="#3498db" />
+  <circle cx="60" cy="60" r="2" fill="#3498db" />
+  <circle cx="45" cy="65" r="2" fill="#3498db" />
+  <circle cx="55" cy="65" r="2" fill="#3498db" />
+  
+  <!-- Animated Pulse (CSS will animate this) -->
+  <circle cx="50" cy="50" r="25" fill="none" stroke="#1abc9c" stroke-width="2" opacity="0.6" class="pulse-circle" />
+  
+  <!-- Definitions -->
+  <defs>
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2c3e50" />
+      <stop offset="100%" stop-color="#1a202c" />
+    </linearGradient>
+  </defs>
+  
+  <style>
+    .pulse-circle {
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0% { opacity: 0.2; r: 25; }
+      50% { opacity: 0.5; r: 27; }
+      100% { opacity: 0.2; r: 25; }
+    }
+  </style>
+</svg>

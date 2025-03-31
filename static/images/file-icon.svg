@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+  <!-- Document Icon with Animation -->
+  <g fill="none" stroke="#3498db" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <!-- File Shape -->
+    <path d="M14,2 h-8 c-1.1,0-2,0.9-2,2 v16 c0,1.1,0.9,2,2,2 h12 c1.1,0,2-0.9,2-2 v-12 l-6-6 z" class="file"/>
+    
+    <!-- Corner Fold -->
+    <path d="M14,2 v6 h6" class="fold"/>
+    
+    <!-- File Content Lines -->
+    <path d="M8,13 h8 M8,17 h8 M8,9 h3" class="content"/>
+    
+    <!-- Animated Scan Line -->
+    <line x1="6" y1="7" x2="18" y2="7" class="scan-line" transform="translate(0, 6)"/>
+  </g>
+  
+  <style>
+    .scan-line {
+      opacity: 0.7;
+      stroke: #16a085;
+      animation: scanFile 2s infinite;
+    }
+    
+    @keyframes scanFile {
+      0% { transform: translate(0, 6); }
+      50% { transform: translate(0, 12); }
+      100% { transform: translate(0, 6); }
+    }
+  </style>
+</svg>
