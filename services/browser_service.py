@@ -266,11 +266,18 @@ def process_autonomous_navigation(client, instructions, browser=None):
             input=[
                 {
                     "role": "user",
-                    "content": instructions
-                },
-                {
-                    "type": "input_image",
-                    "image_url": f"data:image/png;base64,{screenshot_base64}"
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": instructions
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/png;base64,{screenshot_base64}"
+                            }
+                        }
+                    ]
                 }
             ],
             reasoning={
@@ -317,7 +324,7 @@ def process_autonomous_navigation(client, instructions, browser=None):
                         actions_summary.append("Error al capturar pantalla después de la acción")
                         break
                     
-                    # Send the result back to the model
+                    # Send the result back to the model with updated format
                     response = client.responses.create(
                         model="computer-use-preview",
                         tools=[{
@@ -329,14 +336,20 @@ def process_autonomous_navigation(client, instructions, browser=None):
                         input=[
                             {
                                 "role": "user",
-                                "content": instructions
-                            },
-                            {
-                                "type": "computer_call_output",
-                                "call_id": item.call_id,
-                                "image_url": f"data:image/png;base64,{new_screenshot_base64}"
+                                "content": [
+                                    {
+                                        "type": "text",
+                                        "text": "Continúa con la tarea: " + instructions
+                                    }
+                                ]
                             }
                         ],
+                        computer_call_output={
+                            "call_id": item.call_id,
+                            "image_url": {
+                                "url": f"data:image/png;base64,{new_screenshot_base64}"
+                            }
+                        },
                         reasoning={
                             "generate_summary": "concise",
                         },
