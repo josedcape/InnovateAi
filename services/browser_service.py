@@ -8,8 +8,11 @@ import json
 import logging
 import time
 from io import BytesIO
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 import tempfile
+import random
+import uuid
+from uuid import uuid4
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -44,21 +47,106 @@ class MockBrowser:
         return True
         
     def take_screenshot(self):
-        """Return a placeholder screenshot"""
+        """Return a visually rich placeholder screenshot"""
         try:
-            # Create a blank image
-            img = Image.new('RGB', (self.width, self.height), color=(240, 240, 240))
+            # Create a blank image with background color
+            img = Image.new('RGB', (self.width, self.height), color=(245, 245, 245))
+            draw = ImageDraw.Draw(img)
+            
+            # Add browser chrome (header)
+            draw.rectangle([(0, 0), (self.width, 80)], fill=(53, 54, 58))
+            
+            # Add browser controls
+            # Back button
+            draw.rectangle([(10, 30), (40, 50)], fill=(70, 70, 70))
+            draw.polygon([(15, 40), (25, 30), (25, 50)], fill=(200, 200, 200))
+            
+            # Forward button
+            draw.rectangle([(45, 30), (75, 50)], fill=(70, 70, 70))
+            draw.polygon([(70, 40), (60, 30), (60, 50)], fill=(200, 200, 200))
+            
+            # Reload button
+            draw.rectangle([(80, 30), (110, 50)], fill=(70, 70, 70))
+            draw.ellipse([(85, 35), (105, 45)], outline=(200, 200, 200), width=2)
+            
+            # Add address bar
+            draw.rectangle([(120, 30), (self.width - 120, 50)], fill=(255, 255, 255), outline=(200, 200, 200))
+            draw.text((130, 35), self.current_url, fill=(0, 0, 0))
+            
+            # Menu button
+            draw.rectangle([(self.width - 50, 30), (self.width - 20, 50)], fill=(70, 70, 70))
+            draw.rectangle([(self.width - 45, 35), (self.width - 25, 37)], fill=(200, 200, 200))
+            draw.rectangle([(self.width - 45, 40), (self.width - 25, 42)], fill=(200, 200, 200))
+            draw.rectangle([(self.width - 45, 45), (self.width - 25, 47)], fill=(200, 200, 200))
+            
+            # Page content based on URL
+            if "google.com" in self.current_url:
+                # Draw Google-like interface
+                # Logo
+                draw.rectangle([(self.width/2 - 150, 150), (self.width/2 + 150, 200)], fill=(235, 235, 235))
+                draw.text((self.width/2 - 50, 170), "Google", fill=(66, 133, 244), align="center")
+                
+                # Search box
+                draw.rectangle([(self.width/2 - 200, 220), (self.width/2 + 200, 260)], fill=(255, 255, 255), outline=(200, 200, 200), width=1)
+                
+                # Buttons
+                draw.rectangle([(self.width/2 - 100, 290), (self.width/2 - 20, 320)], fill=(240, 240, 240), outline=(220, 220, 220))
+                draw.text((self.width/2 - 85, 300), "Search", fill=(0, 0, 0))
+                
+                draw.rectangle([(self.width/2 + 20, 290), (self.width/2 + 140, 320)], fill=(240, 240, 240), outline=(220, 220, 220))
+                draw.text((self.width/2 + 25, 300), "I'm Feeling Lucky", fill=(0, 0, 0))
+                
+            elif "example.com" in self.current_url:
+                # Example.com page
+                draw.rectangle([(100, 120), (self.width - 100, 170)], fill=(235, 235, 235))
+                draw.text((120, 140), "Example Domain", fill=(0, 0, 0))
+                
+                for i in range(3):
+                    y_pos = 200 + i * 60
+                    draw.rectangle([(100, y_pos), (self.width - 100, y_pos + 40)], fill=(245, 245, 245), outline=(220, 220, 220))
+                    draw.text((120, y_pos + 15), f"Sample content block {i+1}", fill=(0, 0, 0))
+            
+            else:
+                # Generic page
+                draw.rectangle([(100, 120), (self.width - 100, 170)], fill=(235, 235, 235))
+                page_title = self.current_url.split('//')[1].split('/')[0] if '//' in self.current_url else "Website"
+                draw.text((120, 140), f"{page_title}", fill=(0, 0, 0))
+                
+                # Menu
+                draw.rectangle([(100, 180), (300, 400)], fill=(250, 250, 250), outline=(230, 230, 230))
+                menu_items = ["Home", "About", "Products", "Services", "Contact"]
+                for i, item in enumerate(menu_items):
+                    draw.text((120, 200 + i * 40), item, fill=(0, 0, 0))
+                
+                # Content area
+                draw.rectangle([(320, 180), (self.width - 100, 400)], fill=(255, 255, 255), outline=(230, 230, 230))
+                draw.text((340, 200), "Welcome to our website", fill=(0, 0, 0))
+                draw.text((340, 240), "This is a simulated browser view for", fill=(0, 0, 0))
+                draw.text((340, 260), "demonstrating OpenAI's Computer Use capability", fill=(0, 0, 0))
+                
+                # Add footer
+                draw.rectangle([(100, 420), (self.width - 100, 460)], fill=(240, 240, 240))
+                draw.text((120, 435), "© 2025 Simulated Browser | Privacy | Terms", fill=(100, 100, 100))
+            
+            # Add notification that this is a simulation
+            draw.rectangle([(20, self.height - 40), (self.width - 20, self.height - 20)], fill=(255, 240, 200))
+            draw.text((30, self.height - 35), 
+                     "Simulated Browser - OpenAI Computer Use API - No real web browsing available in this environment", 
+                     fill=(150, 100, 50))
+            
+            # Save to a file
+            static_temp_dir = os.path.join(os.getcwd(), "static", "temp")
+            os.makedirs(static_temp_dir, exist_ok=True)
+            screenshot_file = os.path.join(static_temp_dir, f"screenshot_{int(time.time())}.png")
+            img.save(screenshot_file)
+            self.screenshot_path = screenshot_file
+            
+            # Convert to base64 for API
             buffer = BytesIO()
             img.save(buffer, format="PNG")
             buffer.seek(0)
-            
-            # Save to a file
-            screenshot_file = os.path.join(self.temp_dir, f"screenshot_{int(time.time())}.png")
-            with open(screenshot_file, "wb") as f:
-                f.write(buffer.getvalue())
-            self.screenshot_path = screenshot_file
-            
             return base64.b64encode(buffer.getvalue()).decode("utf-8")
+            
         except Exception as e:
             logger.error(f"Error creating mock screenshot: {e}")
             return None
@@ -67,7 +155,98 @@ class MockBrowser:
         """Simulate executing a browser action"""
         self.mock_actions.append(action)
         logger.info(f"Simulated action: {action}")
-        return True
+        
+        try:
+            action_type = action.get("type", "")
+            
+            if action_type == "navigate":
+                self.current_url = action.get("url", "https://www.google.com")
+                logger.info(f"Navigated to: {self.current_url}")
+                
+            elif action_type == "click":
+                x, y = action.get("x", 0), action.get("y", 0)
+                logger.info(f"Clicked at position: ({x}, {y})")
+                
+                # Simulate navigation based on click position
+                if y < 50:  # Browser controls area
+                    if 10 <= x <= 40:  # Back button
+                        logger.info("Clicked back button")
+                    elif 45 <= x <= 75:  # Forward button
+                        logger.info("Clicked forward button")
+                    elif 80 <= x <= 110:  # Reload button
+                        logger.info("Clicked reload button")
+                
+                # Handle Google-like interface clicks
+                elif "google.com" in self.current_url:
+                    if 150 <= y <= 260 and (self.width/2 - 200) <= x <= (self.width/2 + 200):
+                        # Clicked in search box
+                        logger.info("Clicked Google search box")
+                    elif 290 <= y <= 320:
+                        if (self.width/2 - 100) <= x <= (self.width/2 - 20):
+                            # Search button
+                            logger.info("Clicked Google Search button")
+                            if self.mock_actions and len(self.mock_actions) >= 2:
+                                # Check for previous typing action
+                                prev_actions = [a for a in self.mock_actions[-2:] if a.get("type") == "type"]
+                                if prev_actions:
+                                    search_term = prev_actions[0].get("text", "")
+                                    self.current_url = f"https://www.google.com/search?q={search_term.replace(' ', '+')}"
+                                    logger.info(f"Simulated search for: {search_term}")
+                
+                # Handle example.com interface clicks
+                elif "example.com" in self.current_url:
+                    # Just log clicks, no navigation changes
+                    logger.info("Clicked on example.com page element")
+                
+                # Handle generic page clicks
+                else:
+                    # Check if menu item was clicked
+                    if 180 <= y <= 400 and 100 <= x <= 300:
+                        menu_index = (y - 200) // 40
+                        if 0 <= menu_index < 5:  # We have 5 menu items
+                            menu_items = ["Home", "About", "Products", "Services", "Contact"]
+                            clicked_item = menu_items[int(menu_index)]
+                            logger.info(f"Clicked menu item: {clicked_item}")
+                            
+                            # Update URL based on clicked menu item
+                            domain = self.current_url.split('//')[1].split('/')[0] if '//' in self.current_url else "example.com"
+                            self.current_url = f"https://{domain}/{clicked_item.lower()}"
+                
+            elif action_type == "type":
+                text = action.get("text", "")
+                logger.info(f"Typed text: {text}")
+                
+                # If we're typing in an address bar (based on Y position)
+                if hasattr(self, "last_click_y") and getattr(self, "last_click_y", 0) < 50:
+                    if text.startswith("http") or "." in text:
+                        self.current_url = text if text.startswith("http") else f"https://{text}"
+                
+            elif action_type == "press":
+                key = action.get("key", "")
+                logger.info(f"Pressed key: {key}")
+                
+                # Handle Enter key specially
+                if key.lower() == "enter":
+                    # Check for previous typing action
+                    if self.mock_actions and len(self.mock_actions) >= 2:
+                        prev_actions = [a for a in self.mock_actions[-2:] if a.get("type") == "type"]
+                        if prev_actions:
+                            text = prev_actions[0].get("text", "")
+                            if text.startswith("http") or "." in text:
+                                self.current_url = text if text.startswith("http") else f"https://{text}"
+                            elif "google.com" in self.current_url:
+                                self.current_url = f"https://www.google.com/search?q={text.replace(' ', '+')}"
+            
+            # Store last click position for context in future actions
+            if action_type == "click":
+                self.last_click_x = action.get("x", 0)
+                self.last_click_y = action.get("y", 0)
+                
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error simulating action: {e}")
+            return False
         
     def get_current_url(self):
         """Return the simulated current URL"""
@@ -268,11 +447,11 @@ def process_autonomous_navigation(client, instructions, browser=None):
                     "role": "user",
                     "content": [
                         {
-                            "type": "text",
+                            "type": "input_text",
                             "text": instructions
                         },
                         {
-                            "type": "image_url",
+                            "type": "input_image",
                             "image_url": {
                                 "url": f"data:image/png;base64,{screenshot_base64}"
                             }
@@ -338,7 +517,7 @@ def process_autonomous_navigation(client, instructions, browser=None):
                                 "role": "user",
                                 "content": [
                                     {
-                                        "type": "text",
+                                        "type": "input_text",
                                         "text": "Continúa con la tarea: " + instructions
                                     }
                                 ]
@@ -361,7 +540,7 @@ def process_autonomous_navigation(client, instructions, browser=None):
             if not has_action:
                 # Check if we have a text response
                 for item in response.output:
-                    if item.type == "text":
+                    if item.type == "output_text":
                         actions_summary.append(f"Resultado: {item.text}")
                 break
         
