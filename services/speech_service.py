@@ -5,13 +5,27 @@ import os
 import uuid
 import logging
 import requests
+import base64
 from gtts import gTTS
+
+# Google Cloud TTS client
+try:
+    from google.cloud import texttospeech
+    GOOGLE_TTS_AVAILABLE = True
+except ImportError:
+    GOOGLE_TTS_AVAILABLE = False
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Google Cloud API Key - Using this for enhanced TTS quality
+# Google Cloud credentials file path
+GOOGLE_CREDENTIALS_FILE = os.path.join('credentials', 'botidinamix-g.json')
+if os.path.exists(GOOGLE_CREDENTIALS_FILE):
+    os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = GOOGLE_CREDENTIALS_FILE
+    logger.info(f"Using Google Cloud credentials from {GOOGLE_CREDENTIALS_FILE}")
+
+# Google Cloud API Key - Using this as fallback
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
 
 # Audio folder path
@@ -158,21 +172,107 @@ def text_to_speech_gtts(text, lang='en'):
             raise Exception(f"Failed to convert text to speech: {e}")
 
 
+def get_google_cloud_tts(text, language='en', voice=None):
+    """
+    Convert text to speech using Google Cloud Text-to-Speech client library
+    This uses the Google Cloud credentials file
+    Returns the path to the generated audio file
+    """
+    if not GOOGLE_TTS_AVAILABLE or not os.path.exists(GOOGLE_CREDENTIALS_FILE):
+        logger.warning("Google Cloud credentials not found or library not available")
+        return None
+    
+    try:
+        # Initialize the client
+        client = texttospeech.TextToSpeechClient()
+        
+        # Set the text input to be synthesized
+        synthesis_input = texttospeech.SynthesisInput(text=text)
+        
+        # Map simple language codes to Google's language-region format if needed
+        voice_language = language
+        if len(language) == 2:
+            if language == 'en':
+                voice_language = "en-US"
+            elif language == 'es':
+                voice_language = "es-ES"
+            elif language == 'fr':
+                voice_language = "fr-FR"
+            elif language == 'de':
+                voice_language = "de-DE"
+            elif language == 'it':
+                voice_language = "it-IT"
+            elif language == 'ja':
+                voice_language = "ja-JP"
+            elif language == 'ko':
+                voice_language = "ko-KR"
+            elif language == 'pt':
+                voice_language = "pt-BR"
+            elif language == 'ru':
+                voice_language = "ru-RU"
+            elif language == 'zh':
+                voice_language = "cmn-CN"
+        
+        # Select voice based on language
+        voice_name = voice if voice else f"{voice_language}-Neural2-F"
+        
+        # Build the voice request
+        voice = texttospeech.VoiceSelectionParams(
+            language_code=voice_language,
+            name=voice_name
+        )
+        
+        # Select the type of audio file
+        audio_config = texttospeech.AudioConfig(
+            audio_encoding=texttospeech.AudioEncoding.MP3
+        )
+        
+        # Perform the text-to-speech request
+        response = client.synthesize_speech(
+            input=synthesis_input, voice=voice, audio_config=audio_config
+        )
+        
+        # Create a unique filename
+        filename = f"{uuid.uuid4()}.mp3"
+        file_path = os.path.join(AUDIO_FOLDER, filename)
+        
+        # Ensure the directory exists
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        
+        # Write the response to the output file
+        with open(file_path, "wb") as out:
+            out.write(response.audio_content)
+        
+        logger.info(f"Successfully created speech file: {file_path}")
+        return file_path
+        
+    except Exception as e:
+        logger.error(f"Error using Google Cloud TTS client: {e}")
+        return None
+
+
 def text_to_speech(text, language='en', voice=None):
     """
     Main entry point for text-to-speech conversion
-    Tries enhanced Google Cloud TTS first, falls back to gTTS
+    Tries different TTS methods in order of preference:
+    1. Google Cloud TTS client (using credentials file)
+    2. Google Cloud TTS REST API (using API key)
+    3. gTTS (fallback)
     """
     # Check if text is empty or None
     if not text or text.strip() == '':
         logger.error("Empty text provided to text_to_speech")
         text = "Lo siento, hubo un problema al generar una respuesta."
     
-    # Try Google Cloud TTS first for better quality
-    voice_to_use = voice if voice else 'en-US-Neural2-F'
-    tts_file_path = get_google_tts_enhanced(text, language=language, voice=voice_to_use)
+    # Try Google Cloud TTS client first (credentials-based)
+    tts_file_path = get_google_cloud_tts(text, language=language, voice=voice)
     
-    # Fall back to gTTS if Google Cloud TTS fails
+    # If that fails, try the REST API with API key
+    if not tts_file_path and GOOGLE_API_KEY:
+        voice_to_use = voice if voice else 'en-US-Neural2-F'
+        tts_file_path = get_google_tts_enhanced(text, language=language, voice=voice_to_use)
+    
+    # Fall back to gTTS if all Google methods fail
     if not tts_file_path:
         tts_file_path = text_to_speech_gtts(text, lang=language)
     

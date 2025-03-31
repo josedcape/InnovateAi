@@ -86,7 +86,10 @@ def process_query_default(client, input_data, is_text=False):
             messages=[
                 {
                     "role": "system",
-                    "content": "You are INNOVATE AI, a helpful AI assistant for a digital software and marketing agency. You provide concise, accurate, and helpful responses."
+                    "content": "Eres INNOVATE AI, un asistente de IA avanzado para una agencia de software y marketing digital. "
+                    "Proporcionas respuestas concisas, precisas y útiles. Hablas el mismo idioma que el usuario, adaptándote "
+                    "a su forma de comunicación. Eres respetuoso y profesional en todo momento. Para preguntas en español, "
+                    "respondes en español, y para preguntas en otros idiomas, respondes en el idioma correspondiente cuando sea posible."
                 },
                 {
                     "role": "user",
@@ -94,6 +97,7 @@ def process_query_default(client, input_data, is_text=False):
                 }
             ],
             temperature=0.7,
+            max_tokens=800,
         )
         
         # Handle empty response or null content
@@ -122,9 +126,11 @@ def process_query_with_web_search(client, input_data, is_text=False):
             messages=[
                 {
                     "role": "system",
-                    "content": "You are INNOVATE AI, a helpful AI assistant with web search capabilities. "
-                    "This means you have the ability to search the internet for the latest information to provide accurate and up-to-date responses. "
-                    "Be concise but thorough in your answers."
+                    "content": "Eres INNOVATE AI, un asistente de IA con capacidades de búsqueda web. "
+                    "Tienes la capacidad de buscar en internet para proporcionar información actualizada y precisa. "
+                    "Debes ser conciso pero completo en tus respuestas. Si no puedes buscar en la web o no tienes "
+                    "acceso a la información solicitada, explica claramente que no puedes acceder a esa información "
+                    "en este momento, pero ofrece alternativas de lo que podrías hacer por el usuario."
                 },
                 {
                     "role": "user",
@@ -150,11 +156,18 @@ def process_query_with_web_search(client, input_data, is_text=False):
             }],
             tool_choice="auto",
             temperature=0.7,
+            max_tokens=800,
         )
+        
+        # If we have a tool_call, extract info about the search attempt
+        tool_call_info = ""
+        if hasattr(response.choices[0].message, 'tool_calls') and response.choices[0].message.tool_calls:
+            tool_call_info = "\n\nIntento de búsqueda: " + json.dumps(response.choices[0].message.tool_calls[0].function)
+            logger.info(f"Tool call info: {tool_call_info}")
         
         # Handle empty response
         if not response or not response.choices or not response.choices[0].message.content:
-            return transcript, "Lo siento, no pude encontrar información sobre ese tema. Por favor intenta con otra búsqueda."
+            return transcript, f"Lo siento, no pude encontrar información sobre ese tema. Por favor intenta con otra búsqueda.{tool_call_info}"
             
         return transcript, response.choices[0].message.content
     except Exception as e:
@@ -178,10 +191,12 @@ def process_query_with_computer_use(client, input_data, is_text=False):
             messages=[
                 {
                     "role": "system",
-                    "content": "You are INNOVATE AI, an AI assistant with computer use capabilities. "
-                    "You can assist with tasks related to computer usage, such as file organization, "
-                    "basic system operations, and software recommendations. "
-                    "Provide helpful guidance on computer-related tasks."
+                    "content": "Eres INNOVATE AI, un asistente de IA con capacidades de uso de computadora. "
+                    "Puedes ayudar con tareas relacionadas con el uso de computadoras, como organización de archivos, "
+                    "operaciones básicas del sistema y recomendaciones de software. "
+                    "Si te piden abrir una página web o ejecutar un programa específico, explica amablemente que eres "
+                    "un asistente virtual y no puedes controlar directamente la computadora del usuario, pero puedes "
+                    "proporcionar instrucciones paso a paso sobre cómo hacerlo."
                 },
                 {
                     "role": "user",
@@ -197,6 +212,7 @@ def process_query_with_computer_use(client, input_data, is_text=False):
             }],
             tool_choice="auto",
             temperature=0.7,
+            max_tokens=800,
         )
         
         return transcript, response.choices[0].message.content
@@ -216,7 +232,7 @@ def process_query_with_file_search(client, input_data, vector_store_id=None, is_
             transcript = transcribe_audio(client, input_data)
         
         if not vector_store_id:
-            return transcript, "I don't have any files to search through yet. Please upload some files first."
+            return transcript, "No tengo archivos disponibles para buscar. Por favor, sube algunos archivos primero."
         
         # Process with file search assistant
         response = client.chat.completions.create(
@@ -224,9 +240,10 @@ def process_query_with_file_search(client, input_data, vector_store_id=None, is_
             messages=[
                 {
                     "role": "system",
-                    "content": "You are INNOVATE AI, an AI assistant with file search capabilities. "
-                    "You can search through uploaded documents to find relevant information. "
-                    "When referencing information from files, mention the source document."
+                    "content": "Eres INNOVATE AI, un asistente de IA con capacidades de búsqueda en archivos. "
+                    "Puedes buscar en documentos subidos para encontrar información relevante. "
+                    "Cuando hagas referencia a información de los archivos, menciona el documento fuente. "
+                    "Adaptate al idioma del usuario, respondiendo en español si te preguntan en español."
                 },
                 {
                     "role": "user",
@@ -260,6 +277,7 @@ def process_query_with_file_search(client, input_data, vector_store_id=None, is_
                 }
             },
             temperature=0.7,
+            max_tokens=800,
         )
         
         return transcript, response.choices[0].message.content
