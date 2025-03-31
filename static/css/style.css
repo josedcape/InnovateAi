@@ -153,6 +153,30 @@ button {
     background-color: var(--success-color);
 }
 
+.feature-links {
+    display: flex;
+    justify-content: center;
+    margin-top: 10px;
+}
+
+.feature-link {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 10px;
+    background: rgba(48, 207, 208, 0.2);
+    border-radius: 5px;
+    color: #fff;
+    text-decoration: none;
+    font-size: 0.8rem;
+    transition: all 0.3s ease;
+}
+
+.feature-link:hover {
+    background: rgba(48, 207, 208, 0.4);
+    transform: translateY(-2px);
+}
+
 /* Main Content Area */
 .content-section {
     display: flex;

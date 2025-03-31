@@ -244,8 +244,28 @@ def process_query_with_computer_use(client, input_data, is_text=False):
             transcript = transcribe_audio(client, input_data)
         
         try:
-            # Intenta usar el modelo especializado computer-use-preview
-            # Este modelo es el recomendado para tareas de uso de computadora
+            # Importamos el servicio de navegación autónoma en este punto para evitar imports circulares
+            from services.browser_service import process_autonomous_navigation
+            
+            # Ejecutamos la navegación autónoma con las instrucciones del usuario
+            transcript, navigation_summary, screenshot_path = process_autonomous_navigation(client, transcript)
+            
+            # Si tenemos un resumen de la navegación, lo devolvemos como respuesta
+            if navigation_summary:
+                # Si la navegación fue exitosa, construimos una respuesta detallada
+                answer = "He ejecutado las siguientes acciones automáticamente:\n\n"
+                answer += navigation_summary
+                
+                # Agregamos información sobre la captura de pantalla final si está disponible
+                if screenshot_path:
+                    answer += f"\n\nHe guardado una captura de pantalla del resultado final para tu referencia."
+                
+                return transcript, answer
+            
+            # Si no tenemos un resumen de navegación (falló), intentamos el enfoque original
+            logger.warning("La navegación autónoma falló, usando enfoque alternativo")
+            
+            # Intenta usar el modelo especializado computer-use-preview sin navegación real
             response = client.responses.create(
                 model="computer-use-preview",
                 tools=[{

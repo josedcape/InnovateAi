@@ -46,6 +46,7 @@ from services.openai_service import (
     process_query_with_computer_use,
     process_query_with_file_search
 )
+from services.browser_service import process_autonomous_navigation
 from services.speech_service import text_to_speech
 from services.tools_service import (
     upload_file_to_vector_store,
@@ -259,6 +260,51 @@ def detect_language_endpoint():
         return jsonify({'language': detected_lang})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/computer-use', methods=['POST'])
+def computer_use_endpoint():
+    """Procesa instrucciones para navegación autónoma usando computer-use-preview"""
+    if not request.json or 'instructions' not in request.json:
+        return jsonify({'error': 'No se proporcionaron instrucciones'}), 400
+    
+    instructions = request.json['instructions']
+    
+    # Create OpenAI client
+    client = create_openai_client()
+    
+    try:
+        # Ejecutar navegación autónoma
+        _, navigation_summary, screenshot_path = process_autonomous_navigation(client, instructions)
+        
+        # Prepara la respuesta
+        response = {
+            'summary': navigation_summary,
+        }
+        
+        # Si tenemos una captura de pantalla, la incluimos
+        if screenshot_path:
+            screenshot_url = screenshot_path.replace(os.getcwd(), '')
+            if not screenshot_url.startswith('/'):
+                screenshot_url = '/' + screenshot_url
+            response['screenshot_url'] = screenshot_url
+        
+        return jsonify(response)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/computer-use-demo')
+def computer_use_demo():
+    """Renderiza la página de demostración de navegación autónoma"""
+    return render_template('computer_use_demo.html')
+
+
+@app.route('/screenshots/<path:filename>')
+def serve_screenshot(filename):
+    """Sirve capturas de pantalla del navegador autónomo"""
+    return send_from_directory('tmp', filename)
+
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=5000, debug=True)
