@@ -111,7 +111,7 @@ def process_query_default(client, input_data, is_text=False):
 
 
 def process_query_with_web_search(client, input_data, is_text=False):
-    """Process a query using web search capabilities"""
+    """Process a query using web search capabilities with GPT-4o-search-preview"""
     try:
         # Handle text input
         if is_text:
@@ -120,59 +120,102 @@ def process_query_with_web_search(client, input_data, is_text=False):
             # Transcribe audio to text
             transcript = transcribe_audio(client, input_data)
         
-        # Process with web search assistant
-        response = client.chat.completions.create(
-            model="gpt-4o",  # the newest OpenAI model is "gpt-4o" which was released May 13, 2024
-            messages=[
-                {
-                    "role": "system",
-                    "content": "Eres INNOVATE AI, un asistente de IA con capacidades de búsqueda web. "
-                    "Tienes la capacidad de buscar en internet para proporcionar información actualizada y precisa. "
-                    "Debes ser conciso pero completo en tus respuestas. Si no puedes buscar en la web o no tienes "
-                    "acceso a la información solicitada, explica claramente que no puedes acceder a esa información "
-                    "en este momento, pero ofrece alternativas de lo que podrías hacer por el usuario."
-                },
-                {
-                    "role": "user",
-                    "content": transcript
-                }
-            ],
-            tools=[{
-                "type": "function",
-                "function": {
-                    "name": "web_search",
-                    "description": "Search the web for information on a given query. Use this when you need to find up-to-date information.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "query": {
-                                "type": "string", 
-                                "description": "The search query"
-                            }
-                        },
-                        "required": ["query"]
+        # Process using the new web search model
+        try:
+            # Try using the new gpt-4o-search-preview model which has integrated web search
+            response = client.chat.completions.create(
+                model="gpt-4o-search-preview",
+                web_search_options={},  # Enable web search
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "Eres INNOVATE AI, un asistente de IA con capacidades de búsqueda web. "
+                        "Tienes la capacidad de buscar en internet para proporcionar información actualizada y precisa. "
+                        "Debes ser conciso pero completo en tus respuestas. Prioriza fuentes confiables y actualizada. "
+                        "Habla en el mismo idioma que el usuario. Si te preguntan en español, responde en español."
+                    },
+                    {
+                        "role": "user",
+                        "content": transcript
                     }
-                }
-            }],
-            tool_choice="auto",
-            temperature=0.7,
-            max_tokens=800,
-        )
-        
-        # If we have a tool_call, extract info about the search attempt
-        tool_call_info = ""
-        if hasattr(response.choices[0].message, 'tool_calls') and response.choices[0].message.tool_calls:
-            tool_call_info = "\n\nIntento de búsqueda: " + json.dumps(response.choices[0].message.tool_calls[0].function)
-            logger.info(f"Tool call info: {tool_call_info}")
-        
-        # Handle empty response
-        if not response or not response.choices or not response.choices[0].message.content:
-            return transcript, f"Lo siento, no pude encontrar información sobre ese tema. Por favor intenta con otra búsqueda.{tool_call_info}"
+                ],
+                temperature=0.7,
+                max_tokens=800,
+            )
             
-        return transcript, response.choices[0].message.content
+            # Handle empty response
+            if not response or not response.choices or not response.choices[0].message.content:
+                return transcript, "Lo siento, no pude encontrar información sobre ese tema. Por favor intenta con otra búsqueda."
+                
+            return transcript, response.choices[0].message.content
+            
+        except Exception as search_error:
+            # Log the error but continue with fallback
+            logger.warning(f"New search model failed: {search_error}, falling back to tools approach")
+            
+            # Fallback to the tools approach
+            response = client.chat.completions.create(
+                model="gpt-4o",  # the newest OpenAI model is "gpt-4o" which was released May 13, 2024
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "Eres INNOVATE AI, un asistente de IA con capacidades de búsqueda web. "
+                        "Tienes la capacidad de buscar en internet para proporcionar información actualizada y precisa. "
+                        "Debes ser conciso pero completo en tus respuestas. Si no puedes buscar en la web o no tienes "
+                        "acceso a la información solicitada, explica claramente que no puedes acceder a esa información "
+                        "en este momento, pero ofrece alternativas de lo que podrías hacer por el usuario."
+                    },
+                    {
+                        "role": "user",
+                        "content": transcript
+                    }
+                ],
+                tools=[{
+                    "type": "function",
+                    "function": {
+                        "name": "web_search",
+                        "description": "Search the web for information on a given query. Use this when you need to find up-to-date information.",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "query": {
+                                    "type": "string", 
+                                    "description": "The search query"
+                                }
+                            },
+                            "required": ["query"]
+                        }
+                    }
+                }],
+                tool_choice="auto",
+                temperature=0.7,
+                max_tokens=800,
+            )
+            
+            # Handle tool calls in a safer way
+            tool_call_info = ""
+            if hasattr(response.choices[0].message, 'tool_calls') and response.choices[0].message.tool_calls:
+                try:
+                    # Extract function name and arguments without trying to serialize the entire function object
+                    tool_call = response.choices[0].message.tool_calls[0]
+                    tool_info = {
+                        "name": tool_call.function.name,
+                        "arguments": tool_call.function.arguments
+                    }
+                    tool_call_info = "\n\nIntento de búsqueda: " + json.dumps(tool_info)
+                    logger.info(f"Tool call info: {tool_call_info}")
+                except Exception as tool_error:
+                    logger.error(f"Error extracting tool call info: {tool_error}")
+            
+            # Handle empty response
+            if not response or not response.choices or not response.choices[0].message.content:
+                return transcript, f"Lo siento, no pude encontrar información sobre ese tema. Por favor intenta con otra búsqueda.{tool_call_info}"
+                
+            return transcript, response.choices[0].message.content
+            
     except Exception as e:
         logger.error(f"Error processing query with web search: {e}")
-        raise Exception(f"Failed to process query with web search: {e}")
+        return transcript, "Lo siento, hubo un problema con la búsqueda web. Por favor intenta nuevamente con una consulta diferente."
 
 
 def process_query_with_computer_use(client, input_data, is_text=False):
