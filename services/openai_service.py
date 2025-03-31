@@ -231,7 +231,10 @@ def process_query_with_web_search(client, input_data, is_text=False):
 
 
 def process_query_with_computer_use(client, input_data, is_text=False):
-    """Process a query using computer use capabilities"""
+    """
+    Process a query using computer use capabilities
+    Utiliza el modelo computer-use-preview para tareas relacionadas con el uso de computadoras
+    """
     try:
         # Handle text input
         if is_text:
@@ -240,40 +243,89 @@ def process_query_with_computer_use(client, input_data, is_text=False):
             # Transcribe audio to text
             transcript = transcribe_audio(client, input_data)
         
-        # Process with computer use assistant
-        response = client.chat.completions.create(
-            model="gpt-4o",  # the newest OpenAI model is "gpt-4o" which was released May 13, 2024
-            messages=[
-                {
-                    "role": "system",
-                    "content": "Eres INNOVATE AI, un asistente de IA con capacidades de uso de computadora. "
-                    "Puedes ayudar con tareas relacionadas con el uso de computadoras, como organización de archivos, "
-                    "operaciones básicas del sistema y recomendaciones de software. "
-                    "Si te piden abrir una página web o ejecutar un programa específico, explica amablemente que eres "
-                    "un asistente virtual y no puedes controlar directamente la computadora del usuario, pero puedes "
-                    "proporcionar instrucciones paso a paso sobre cómo hacerlo."
+        try:
+            # Intenta usar el modelo especializado computer-use-preview
+            # Este modelo es el recomendado para tareas de uso de computadora
+            response = client.responses.create(
+                model="computer-use-preview",
+                tools=[{
+                    "type": "computer_use_preview",
+                    "display_width": 1024,
+                    "display_height": 768,
+                    "environment": "browser"  # Simula un entorno de navegador
+                }],
+                input=[
+                    {
+                        "role": "user",
+                        "content": transcript
+                    }
+                ],
+                reasoning={
+                    "generate_summary": "concise",  # Genera un resumen conciso del razonamiento
                 },
-                {
-                    "role": "user",
-                    "content": transcript
-                }
-            ],
-            tools=[{
-                "type": "function",
-                "function": {
-                    "name": "code_interpreter",
-                    "description": "Execute code or analyze data. Use this to help users with computational tasks."
-                }
-            }],
-            tool_choice="auto",
-            temperature=0.7,
-            max_tokens=800,
-        )
-        
-        return transcript, response.choices[0].message.content
+                truncation="auto"  # Necesario para computer_use_preview
+            )
+            
+            # Formatea la respuesta para mostrar información útil
+            answer = ""
+            
+            # Procesa los diferentes tipos de output en la respuesta
+            for item in response.output:
+                if item.type == "reasoning" and hasattr(item, "summary"):
+                    for summary_item in item.summary:
+                        if summary_item.type == "summary_text":
+                            answer += f"Razonamiento: {summary_item.text}\n\n"
+                
+                elif item.type == "text":
+                    answer += item.text + "\n"
+            
+            # Si no encontramos ninguna respuesta útil
+            if not answer.strip():
+                answer = "He analizado tu solicitud y puedo ayudarte con tareas relacionadas al uso de computadoras. Por favor, indícame qué tarea específica necesitas realizar."
+            
+            return transcript, answer
+            
+        except Exception as computer_use_error:
+            logger.warning(f"Computer-use-preview model failed: {computer_use_error}, falling back to gpt-4o")
+            
+            # Si el modelo especializado falla, usa el modelo GPT-4o como fallback
+            response = client.chat.completions.create(
+                model="gpt-4o",  # the newest OpenAI model is "gpt-4o" which was released May 13, 2024
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "Eres INNOVATE AI, un asistente de IA con capacidades de uso de computadora. "
+                        "Puedes ayudar con tareas relacionadas con el uso de computadoras, como organización de archivos, "
+                        "operaciones básicas del sistema y recomendaciones de software. "
+                        "Si te piden abrir una página web o ejecutar un programa específico, explica amablemente que eres "
+                        "un asistente virtual y no puedes controlar directamente la computadora del usuario, pero puedes "
+                        "proporcionar instrucciones paso a paso sobre cómo hacerlo."
+                    },
+                    {
+                        "role": "user",
+                        "content": transcript
+                    }
+                ],
+                tools=[{
+                    "type": "function",
+                    "function": {
+                        "name": "code_interpreter",
+                        "description": "Execute code or analyze data. Use this to help users with computational tasks."
+                    }
+                }],
+                tool_choice="auto",
+                temperature=0.7,
+                max_tokens=800,
+            )
+            
+            return transcript, response.choices[0].message.content
+            
     except Exception as e:
         logger.error(f"Error processing query with computer use: {e}")
-        raise Exception(f"Failed to process query with computer use: {e}")
+        # Si transcript no está definido en este punto, es por un error muy temprano
+        if 'transcript' not in locals():
+            transcript = "Error de procesamiento"
+        return transcript, f"Lo siento, hubo un problema al procesar tu consulta sobre uso de computadora: {str(e)}"
 
 
 def process_query_with_file_search(client, input_data, vector_store_id=None, is_text=False):

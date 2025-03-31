@@ -411,6 +411,51 @@ document.addEventListener('DOMContentLoaded', function() {
         messageHeader.appendChild(messageAvatar);
         messageHeader.appendChild(messageMeta);
         
+        // Add message actions for AI messages (copy, stop audio)
+        if (role === 'assistant') {
+            const messageActions = document.createElement('div');
+            messageActions.className = 'message-actions';
+            
+            // Copy message button
+            const copyButton = document.createElement('button');
+            copyButton.className = 'action-button copy-button';
+            copyButton.innerHTML = '<i class="fas fa-copy"></i>';
+            copyButton.title = 'Copy to clipboard';
+            copyButton.addEventListener('click', function() {
+                copyToClipboard(text);
+                
+                // Show feedback
+                const originalHTML = copyButton.innerHTML;
+                copyButton.innerHTML = '<i class="fas fa-check"></i>';
+                copyButton.classList.add('copied');
+                
+                setTimeout(() => {
+                    copyButton.innerHTML = originalHTML;
+                    copyButton.classList.remove('copied');
+                }, 2000);
+            });
+            
+            // Stop audio button
+            const stopAudioButton = document.createElement('button');
+            stopAudioButton.className = 'action-button stop-audio-button';
+            stopAudioButton.innerHTML = '<i class="fas fa-volume-mute"></i>';
+            stopAudioButton.title = 'Stop audio playback';
+            stopAudioButton.addEventListener('click', function() {
+                // Stop any currently playing audio
+                if (audioProcessor.currentAudio) {
+                    audioProcessor.currentAudio.pause();
+                    audioProcessor.currentAudio = null;
+                    
+                    // Also pause the avatar video
+                    pauseAvatarVideo();
+                }
+            });
+            
+            messageActions.appendChild(copyButton);
+            messageActions.appendChild(stopAudioButton);
+            messageHeader.appendChild(messageActions);
+        }
+        
         // Create message content
         const messageContent = document.createElement('div');
         messageContent.className = 'message-content';
@@ -420,6 +465,26 @@ document.addEventListener('DOMContentLoaded', function() {
         messageDiv.appendChild(messageContent);
         
         conversationContainer.appendChild(messageDiv);
+    }
+    
+    /**
+     * Copy text to clipboard
+     */
+    function copyToClipboard(text) {
+        // Create a temporary textarea element
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.setAttribute('readonly', '');
+        textarea.style.position = 'absolute';
+        textarea.style.left = '-9999px';
+        document.body.appendChild(textarea);
+        
+        // Select and copy the text
+        textarea.select();
+        document.execCommand('copy');
+        
+        // Clean up
+        document.body.removeChild(textarea);
     }
     
     /**

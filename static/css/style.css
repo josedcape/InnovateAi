@@ -291,6 +291,7 @@ button {
     display: flex;
     align-items: center;
     margin-bottom: 0.5rem;
+    position: relative;
 }
 
 .message-avatar {
@@ -317,6 +318,44 @@ button {
 .message-meta {
     display: flex;
     flex-direction: column;
+    flex-grow: 1;
+}
+
+/* Message actions (copy, stop audio) */
+.message-actions {
+    display: flex;
+    align-items: center;
+    margin-left: auto;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.message:hover .message-actions {
+    opacity: 1;
+}
+
+.action-button {
+    background-color: transparent;
+    border: none;
+    color: var(--muted-text);
+    padding: 4px 8px;
+    cursor: pointer;
+    transition: color 0.2s ease;
+    font-size: 0.9rem;
+    border-radius: var(--radius-sm);
+}
+
+.action-button:hover {
+    color: var(--light-text);
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.copy-button.copied {
+    color: var(--success-color);
+}
+
+.stop-audio-button:hover {
+    color: var(--error-color);
 }
 
 .message-sender {
