@@ -5,251 +5,239 @@
 
 class AITools {
     constructor() {
-        this.currentTool = 'default'; // Default tool
-        this.tools = {}; // Will be populated when loaded from server
-        this.fileUploadSection = null;
+        this.tools = [];
+        this.selectedTool = 'default';
+        this.toolsContainer = null;
+        this.fileUploadContainer = null;
     }
-
+    
     /**
      * Initialize tools UI and functionality
      */
     initTools() {
-        // Get tools data from server
-        fetch('/get_agents')
+        this.toolsContainer = document.querySelector('.tools-container');
+        this.fileUploadContainer = document.querySelector('.file-upload-container');
+        
+        // Fetch available tools from API
+        fetch('/api/agents')
             .then(response => response.json())
-            .then(data => {
-                this.tools = data;
+            .then(agents => {
+                this.tools = agents;
                 this.renderTools();
-                this.initFileUpload();
-                this.loadFiles();
             })
             .catch(error => {
-                console.error('Error loading tools:', error);
+                console.error('Error fetching agents:', error);
+                // Add default tool if API fails
+                this.tools = [{
+                    name: 'Standard Assistant',
+                    type: 'default',
+                    description: 'General-purpose AI assistant with conversation capabilities',
+                    icon: '/static/icons/search-icon.svg'
+                }];
+                this.renderTools();
             });
-            
-        // Initialize file upload section reference
-        this.fileUploadSection = document.getElementById('file-upload-section');
+        
+        // Initialize file upload
+        this.initFileUpload();
     }
-
+    
     /**
      * Render tools UI from loaded data
      */
     renderTools() {
-        const toolsGrid = document.getElementById('tools-grid');
-        if (!toolsGrid) return;
+        // Clear container
+        this.toolsContainer.innerHTML = '';
         
-        // Create tool cards
-        Object.values(this.tools).forEach(tool => {
-            const toolCard = document.createElement('div');
-            toolCard.className = 'tool-card';
-            toolCard.setAttribute('data-tool', tool.type);
+        // Create tool buttons
+        this.tools.forEach(tool => {
+            const toolButton = document.createElement('button');
+            toolButton.className = 'tool-button';
+            toolButton.dataset.toolType = tool.type;
             
-            // Create HTML structure for tool card
-            toolCard.innerHTML = `
-                <div class="tool-icon">
-                    <img src="${tool.icon || '/static/icons/default-icon.svg'}" alt="${tool.name} icon" width="24" height="24">
-                </div>
-                <div class="tool-info">
-                    <h4>${tool.name}</h4>
-                    <p>${tool.description}</p>
-                </div>
+            if (tool.type === this.selectedTool) {
+                toolButton.classList.add('active');
+            }
+            
+            toolButton.innerHTML = `
+                <img src="${tool.icon}" alt="${tool.name}" class="tool-icon">
+                <span class="tool-label">${tool.name}</span>
             `;
             
-            // Add click event listener
-            toolCard.addEventListener('click', () => {
+            toolButton.addEventListener('click', () => {
                 this.selectTool(tool.type);
             });
             
-            toolsGrid.appendChild(toolCard);
+            this.toolsContainer.appendChild(toolButton);
         });
         
-        // Select default tool
-        this.selectTool('default');
+        // Update file upload visibility
+        this.updateFileUploadVisibility();
     }
-
+    
     /**
      * Initialize file upload functionality
      */
     initFileUpload() {
         const fileInput = document.getElementById('file-upload');
-        const fileNameDisplay = document.getElementById('file-name');
-        const uploadButton = document.getElementById('upload-btn');
+        const uploadButton = document.querySelector('.file-upload-button');
+        const successAlert = document.querySelector('.file-upload-success');
+        const errorAlert = document.querySelector('.file-upload-error');
         
-        if (!fileInput || !fileNameDisplay || !uploadButton) return;
+        if (!fileInput || !uploadButton) return;
         
-        // Show file name when selected
-        fileInput.addEventListener('change', (event) => {
-            if (event.target.files.length > 0) {
-                fileNameDisplay.textContent = event.target.files[0].name;
-                document.getElementById('upload-submit-btn').disabled = false;
-            } else {
-                fileNameDisplay.textContent = 'No file selected';
-                document.getElementById('upload-submit-btn').disabled = true;
-            }
-        });
-        
-        // Upload button functionality
         uploadButton.addEventListener('click', () => {
             fileInput.click();
         });
         
-        // Submit button functionality
-        document.getElementById('upload-submit-btn').addEventListener('click', () => {
-            this.uploadFile();
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files.length > 0) {
+                this.uploadFile();
+            }
         });
+        
+        // Load existing files
+        this.loadFiles();
     }
-
+    
     /**
      * Select a tool to use
      * @param {string} toolType Tool identifier
      */
     selectTool(toolType) {
-        // Nothing to do if same tool already selected
-        if (this.currentTool === toolType) return;
+        this.selectedTool = toolType;
         
-        // Update current tool
-        this.currentTool = toolType;
+        // Update UI to reflect selection
+        const toolButtons = this.toolsContainer.querySelectorAll('.tool-button');
+        toolButtons.forEach(button => {
+            if (button.dataset.toolType === toolType) {
+                button.classList.add('active');
+            } else {
+                button.classList.remove('active');
+            }
+        });
         
-        // Remove active class from all tools
-        const toolCards = document.querySelectorAll('.tool-card');
-        toolCards.forEach(card => card.classList.remove('active'));
-        
-        // Add active class to selected tool
-        const selectedCard = document.querySelector(`.tool-card[data-tool="${toolType}"]`);
-        if (selectedCard) {
-            selectedCard.classList.add('active');
-        }
-        
-        // Update UI based on selected tool
+        // Update file upload visibility
         this.updateFileUploadVisibility();
         
-        // Update status text to reflect selected tool
-        const statusText = document.getElementById('status-text');
-        if (statusText) {
-            const toolData = this.getCurrentToolData();
-            statusText.textContent = `Ready to use ${toolData?.name || 'AI Assistant'}`;
+        // Add animation effect
+        const activeButton = this.toolsContainer.querySelector(`.tool-button[data-tool-type="${toolType}"]`);
+        if (activeButton) {
+            activeButton.animate(
+                [
+                    { transform: 'scale(0.95)', opacity: 0.8 },
+                    { transform: 'scale(1.05)', opacity: 1 },
+                    { transform: 'scale(1)', opacity: 1 }
+                ],
+                { duration: 300, easing: 'ease-out' }
+            );
         }
-        
-        console.log(`Selected tool: ${toolType}`);
     }
-
+    
     /**
      * Get the currently selected tool
      * @returns {string} Tool identifier
      */
     getCurrentTool() {
-        return this.currentTool;
+        return this.selectedTool;
     }
-
+    
     /**
      * Get details about the currently selected tool
      * @returns {Object} Tool data
      */
     getCurrentToolData() {
-        return this.tools[this.currentTool] || null;
+        return this.tools.find(tool => tool.type === this.selectedTool);
     }
-
+    
     /**
      * Update file upload section visibility based on selected tool
      */
     updateFileUploadVisibility() {
-        if (!this.fileUploadSection) return;
-        
-        // Show file upload section only for file_search tool
-        if (this.currentTool === 'file_search') {
-            this.fileUploadSection.style.display = 'block';
-        } else {
-            this.fileUploadSection.style.display = 'none';
+        if (this.fileUploadContainer) {
+            if (this.selectedTool === 'file_search') {
+                this.fileUploadContainer.style.display = 'flex';
+            } else {
+                this.fileUploadContainer.style.display = 'none';
+            }
         }
     }
-
+    
     /**
      * Upload a file to the server
      */
     uploadFile() {
         const fileInput = document.getElementById('file-upload');
-        if (!fileInput || !fileInput.files.length) {
-            this.showFileUploadError('Please select a file to upload.');
-            return;
-        }
+        const successAlert = document.querySelector('.file-upload-success');
+        const errorAlert = document.querySelector('.file-upload-error');
+        
+        if (!fileInput.files.length) return;
         
         const file = fileInput.files[0];
-        
-        // Create form data
         const formData = new FormData();
         formData.append('file', file);
         
-        // Show loading state
-        document.getElementById('upload-submit-btn').disabled = true;
-        document.getElementById('upload-submit-btn').textContent = 'Uploading...';
+        // Hide previous alerts
+        successAlert.style.display = 'none';
+        errorAlert.style.display = 'none';
         
-        // Send file to server
-        fetch('/upload_file', {
+        // Upload file
+        fetch('/api/upload-file', {
             method: 'POST',
             body: formData
         })
         .then(response => response.json())
         .then(data => {
             if (data.success) {
+                // Show success message
+                this.showFileUploadSuccess(`File "${file.name}" uploaded successfully!`);
                 // Reset file input
                 fileInput.value = '';
-                document.getElementById('file-name').textContent = 'No file selected';
-                
-                // Show success message
-                this.showFileUploadSuccess(data.message || 'File uploaded successfully.');
-                
-                // Refresh file list
+                // Reload file list
                 this.loadFiles();
             } else {
-                this.showFileUploadError(data.error || 'Failed to upload file.');
+                // Show error message
+                this.showFileUploadError(data.error || 'Error uploading file');
             }
         })
         .catch(error => {
             console.error('Error uploading file:', error);
-            this.showFileUploadError('Error uploading file. Please try again.');
-        })
-        .finally(() => {
-            // Reset button state
-            document.getElementById('upload-submit-btn').textContent = 'Upload';
-            document.getElementById('upload-submit-btn').disabled = false;
+            this.showFileUploadError('Error uploading file: Network error');
         });
     }
-
+    
     /**
      * Load list of uploaded files
      */
     loadFiles() {
-        const fileList = document.getElementById('file-list');
+        const fileList = document.querySelector('.file-list');
+        
         if (!fileList) return;
         
-        // Show loading state
-        fileList.innerHTML = '<li>Loading files...</li>';
-        
-        // Get files from server
-        fetch('/get_files')
+        fetch('/api/files')
             .then(response => response.json())
             .then(data => {
+                fileList.innerHTML = '';
+                
                 if (data.files && data.files.length > 0) {
-                    // Clear list
-                    fileList.innerHTML = '';
-                    
-                    // Add each file to list
                     data.files.forEach(file => {
-                        const li = document.createElement('li');
-                        li.innerHTML = `<i class="fa fa-file"></i> ${file.filename} <small>(${this.formatFileSize(file.size_bytes)})</small>`;
-                        fileList.appendChild(li);
+                        const fileItem = document.createElement('div');
+                        fileItem.className = 'file-item';
+                        fileItem.innerHTML = `
+                            <span>${file.filename}</span>
+                            <span>${this.formatFileSize(file.bytes)}</span>
+                        `;
+                        fileList.appendChild(fileItem);
                     });
                 } else {
-                    // Show empty message
-                    fileList.innerHTML = '<li class="empty-message">No files uploaded yet.</li>';
+                    fileList.innerHTML = '<div class="file-item">No files uploaded yet</div>';
                 }
             })
             .catch(error => {
                 console.error('Error loading files:', error);
-                fileList.innerHTML = '<li class="empty-message">Error loading files.</li>';
+                fileList.innerHTML = '<div class="file-item">Error loading files</div>';
             });
     }
-
+    
     /**
      * Format file size in human-readable format
      * @param {number} bytes File size in bytes
@@ -264,45 +252,60 @@ class AITools {
         
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     }
-
+    
     /**
      * Show a file upload success message
      * @param {string} message Success message to show
      */
     showFileUploadSuccess(message) {
-        const alert = document.createElement('div');
-        alert.className = 'file-upload-alert success';
-        alert.textContent = message;
-        
-        this.showFileUploadAlert(alert);
+        const successAlert = document.querySelector('.file-upload-success');
+        successAlert.textContent = message;
+        this.showFileUploadAlert(successAlert);
     }
-
+    
     /**
      * Show a file upload error message
      * @param {string} message Error message to show
      */
     showFileUploadError(message) {
-        const alert = document.createElement('div');
-        alert.className = 'file-upload-alert error';
-        alert.textContent = message;
-        
-        this.showFileUploadAlert(alert);
+        const errorAlert = document.querySelector('.file-upload-error');
+        errorAlert.textContent = message;
+        this.showFileUploadAlert(errorAlert);
     }
-
+    
     /**
      * Show a file upload alert
      * @param {HTMLElement} alertElement Alert element to show
      */
     showFileUploadAlert(alertElement) {
-        const container = document.getElementById('file-upload-alerts');
-        if (!container) return;
+        // Hide all alerts first
+        document.querySelectorAll('.file-upload-alert').forEach(alert => {
+            alert.style.display = 'none';
+        });
         
-        // Add alert to container
-        container.appendChild(alertElement);
+        // Show the specified alert
+        alertElement.style.display = 'block';
         
-        // Remove alert after 5 seconds
+        // Animate the alert
+        alertElement.animate(
+            [
+                { opacity: 0, transform: 'translateY(-10px)' },
+                { opacity: 1, transform: 'translateY(0)' }
+            ],
+            { duration: 300, easing: 'ease-out' }
+        );
+        
+        // Hide after 5 seconds
         setTimeout(() => {
-            alertElement.remove();
+            alertElement.animate(
+                [
+                    { opacity: 1 },
+                    { opacity: 0 }
+                ],
+                { duration: 300, easing: 'ease-out' }
+            ).onfinish = () => {
+                alertElement.style.display = 'none';
+            };
         }, 5000);
     }
 }

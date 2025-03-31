@@ -7,14 +7,10 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialize modules
     const audioProcessor = new AudioProcessor();
     const aiTools = new AITools();
-    let videoSync = null;
+    let videoSync;
     
     // Initialize UI
     initializeUI();
-    
-    // Global variables
-    let conversationHistory = [];
-    let isProcessing = false;
     
     /**
      * Initialize the user interface and components
@@ -22,46 +18,52 @@ document.addEventListener('DOMContentLoaded', function() {
     function initializeUI() {
         // Initialize audio processor
         audioProcessor.initialize()
-            .then(success => {
-                if (!success) {
-                    addSystemMessage('Error initializing audio context. Please refresh the page and try again.');
-                }
+            .then(() => {
+                console.log('Audio processor initialized');
+            })
+            .catch(error => {
+                console.error('Failed to initialize audio processor:', error);
+                addSystemMessage('Error initializing audio. Please check microphone permissions.');
             });
-        
-        // Initialize tools
-        aiTools.initTools();
         
         // Initialize avatar video
         initializeAvatarVideo();
         
-        // Bind event listeners
-        document.getElementById('mic-button').addEventListener('click', toggleRecording);
-        document.getElementById('stop-button').addEventListener('click', stopRecording);
-        document.getElementById('btn-clear').addEventListener('click', clearConversation);
+        // Initialize AI tools
+        aiTools.initTools();
         
-        // Initialize with stop button disabled
-        document.getElementById('stop-button').disabled = true;
+        // Set up recording button
+        const recordButton = document.getElementById('record-button');
+        if (recordButton) {
+            recordButton.addEventListener('click', toggleRecording);
+        }
         
-        // Show initial system message
-        addSystemMessage('Welcome to INNOVATE AI. Click the microphone button and speak to begin.');
+        // Set up clear conversation button
+        const clearButton = document.querySelector('.clear-button');
+        if (clearButton) {
+            clearButton.addEventListener('click', clearConversation);
+        }
+        
+        // Add welcome message
+        addSystemMessage('Welcome to INNOVATE AI! Click the microphone button to start speaking, or switch between different AI capabilities using the tools above.');
+        
+        // Start visualization
+        visualizeAudio();
     }
-
+    
     /**
      * Initialize the avatar video element
      */
     function initializeAvatarVideo() {
         const videoElement = document.getElementById('avatar-video');
-        
         if (videoElement) {
             videoSync = new VideoSync(videoElement);
-            
-            // Set video source (could be dynamic in the future)
-            videoSync.setSource('/static/assets/innovate.mp4');
+            console.log('Avatar video initialized');
         } else {
             console.error('Avatar video element not found');
         }
     }
-
+    
     /**
      * Toggle recording state
      */
@@ -72,147 +74,152 @@ document.addEventListener('DOMContentLoaded', function() {
             startRecording();
         }
     }
-
+    
     /**
      * Start recording audio
      */
     function startRecording() {
-        // Can't start recording if already processing
-        if (isProcessing) return;
+        const recordButton = document.getElementById('record-button');
+        const statusMessage = document.querySelector('.status-message');
         
-        // Request microphone access and start recording
+        // Update UI
+        recordButton.classList.add('recording');
+        recordButton.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white">
+                <rect x="6" y="6" width="12" height="12" rx="2" />
+            </svg>
+        `;
+        statusMessage.textContent = 'Listening...';
+        
+        // Add user message placeholder
+        const messageId = 'message-' + Date.now();
+        addUserMessage('...', messageId, new Date());
+        
+        // Start recording
         audioProcessor.startRecording(
-            null, // No data available callback needed
-            processAudioRecording // On complete callback
-        )
-        .then(() => {
-            // Update UI to show recording state
-            document.getElementById('mic-button').classList.add('recording');
-            document.getElementById('stop-button').disabled = false;
-            document.getElementById('status-text').textContent = 'Listening...';
-            document.querySelector('.audio-wave').classList.add('active');
-            
-            // Start visualizing audio
-            visualizeAudio();
-        })
-        .catch(error => {
+            // Data available callback
+            (data) => {
+                // This is fired when data is available but recording is still ongoing
+            },
+            // Complete callback
+            (audioBlob) => {
+                processAudioRecording(audioBlob, messageId);
+            }
+        ).catch(error => {
             console.error('Error starting recording:', error);
-            addSystemMessage('Error accessing microphone. Please make sure your microphone is connected and you have granted permission to use it.');
+            addSystemMessage('Error accessing microphone. Please check permissions.');
+            stopRecording();
         });
     }
-
+    
     /**
      * Stop recording audio
      */
     function stopRecording() {
-        if (!audioProcessor.isCurrentlyRecording()) return;
+        const recordButton = document.getElementById('record-button');
+        const statusMessage = document.querySelector('.status-message');
+        
+        // Update UI
+        recordButton.classList.remove('recording');
+        recordButton.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white">
+                <path d="M12 15c1.66 0 3-1.34 3-3V6c0-1.66-1.34-3-3-3S9 4.34 9 6v6c0 1.66 1.34 3 3 3z" />
+                <path d="M17 12c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-2.08c3.39-.49 6-3.39 6-6.92h-2z" />
+            </svg>
+        `;
+        statusMessage.textContent = 'Processing...';
         
         // Stop recording
         audioProcessor.stopRecording();
-        
-        // Update UI
-        document.getElementById('mic-button').classList.remove('recording');
-        document.getElementById('stop-button').disabled = true;
-        document.getElementById('status-text').textContent = 'Processing...';
-        document.querySelector('.audio-wave').classList.remove('active');
-        
-        // Stop visualization
-        cancelAnimationFrame(visualizationAnimationFrame);
     }
-
+    
     /**
      * Process the recorded audio
      */
-    function processAudioRecording(audioBlob) {
-        isProcessing = true;
+    function processAudioRecording(audioBlob, messageId) {
+        const statusMessage = document.querySelector('.status-message');
+        const loadingIndicator = document.querySelector('.loading-indicator');
         
-        // Create form data for uploading
+        // Show loading indicator
+        loadingIndicator.style.display = 'flex';
+        
+        // Create form data for API request
         const formData = new FormData();
         formData.append('audio', audioBlob);
-        formData.append('tool_type', aiTools.getCurrentTool());
         
-        // If using file search, include vector store ID if available
-        if (aiTools.getCurrentTool() === 'file_search') {
-            // This could be expanded to include vector store ID
-            // formData.append('vector_store_id', vectorStoreId);
-        }
+        // Add selected agent type
+        const selectedTool = aiTools.getCurrentTool();
+        formData.append('agent_type', selectedTool);
         
-        // Send audio to server for processing
-        fetch('/process_speech', {
+        // Send the audio to the server
+        fetch('/api/speech', {
             method: 'POST',
             body: formData
         })
         .then(response => response.json())
         .then(data => {
-            if (data.success) {
-                // Add user message to conversation
-                if (data.transcript) {
-                    const messageId = 'msg-' + Date.now();
-                    addUserMessage(data.transcript, messageId, new Date());
-                    
-                    // Store in history
-                    conversationHistory.push({
-                        role: 'user',
-                        content: data.transcript,
-                        timestamp: new Date(),
-                        id: messageId
-                    });
-                }
-                
-                // Add AI response to conversation
-                if (data.response) {
-                    addAIMessage(data.response, new Date());
-                    
-                    // Store in history
-                    conversationHistory.push({
-                        role: 'assistant',
-                        content: data.response,
-                        timestamp: new Date()
-                    });
-                    
-                    // Play audio response if available
-                    if (data.audio_url) {
-                        playAudioResponse(data.audio_url);
-                    }
-                }
-            } else {
-                // Show error message
-                addSystemMessage(data.error || 'Error processing speech. Please try again.');
+            // Hide loading indicator
+            loadingIndicator.style.display = 'none';
+            
+            // Update status
+            statusMessage.textContent = 'Ready';
+            
+            if (data.error) {
+                console.error('Error processing speech:', data.error);
+                addSystemMessage(`Error: ${data.error}`);
+                return;
+            }
+            
+            // Update user message with transcription
+            updateUserMessage(messageId, data.transcript);
+            
+            // Add AI response
+            addAIMessage(data.response, new Date());
+            
+            // Play audio response
+            if (data.audio_url) {
+                playAudioResponse(data.audio_url);
             }
         })
         .catch(error => {
-            console.error('Error processing speech:', error);
-            addSystemMessage('Error communicating with server. Please try again.');
-        })
-        .finally(() => {
-            // Reset processing state
-            isProcessing = false;
-            document.getElementById('status-text').textContent = 'Ready';
+            // Hide loading indicator
+            loadingIndicator.style.display = 'none';
+            
+            // Update status
+            statusMessage.textContent = 'Ready';
+            
+            console.error('Error sending audio to server:', error);
+            addSystemMessage('Error communicating with the server. Please try again.');
         });
     }
-
+    
     /**
      * Play audio response and synchronize with avatar
      */
     function playAudioResponse(audioUrl) {
-        // Start avatar video
-        startAvatarVideo();
+        // Start avatar animation
+        if (videoSync) {
+            startAvatarVideo();
+        }
         
         // Play audio
         const audio = audioProcessor.playAudio(
             audioUrl,
+            // Play callback
             () => {
-                // Audio started playing
-                document.getElementById('status-text').textContent = 'Speaking...';
+                console.log('Audio started playing');
             },
+            // End callback
             () => {
-                // Audio finished playing
-                document.getElementById('status-text').textContent = 'Ready';
-                pauseAvatarVideo();
+                console.log('Audio finished playing');
+                // Stop avatar animation
+                if (videoSync) {
+                    pauseAvatarVideo();
+                }
             }
         );
     }
-
+    
     /**
      * Start avatar video playback
      */
@@ -221,7 +228,7 @@ document.addEventListener('DOMContentLoaded', function() {
             videoSync.play();
         }
     }
-
+    
     /**
      * Pause avatar video playback
      */
@@ -230,155 +237,189 @@ document.addEventListener('DOMContentLoaded', function() {
             videoSync.pause();
         }
     }
-
+    
     /**
      * Visualize audio input in real-time
      */
-    let visualizationAnimationFrame = null;
     function visualizeAudio() {
-        if (!audioProcessor.isCurrentlyRecording()) {
-            cancelAnimationFrame(visualizationAnimationFrame);
-            return;
+        const visualizationBars = document.querySelectorAll('.visualization-bar');
+        
+        // If we don't have visualization bars, create them
+        if (visualizationBars.length === 0) {
+            const visualizationContainer = document.querySelector('.visualization-bars');
+            if (visualizationContainer) {
+                for (let i = 0; i < 50; i++) {
+                    const bar = document.createElement('div');
+                    bar.className = 'visualization-bar';
+                    visualizationContainer.appendChild(bar);
+                }
+            }
         }
         
-        // Get frequency data
-        const frequencyData = audioProcessor.getFrequencyData();
-        
-        if (frequencyData) {
-            // Get audio wave elements
-            const waveElements = document.querySelectorAll('.audio-wave span');
+        function updateVisualization() {
+            // Get frequency data
+            const frequencyData = audioProcessor.getFrequencyData();
+            const bars = document.querySelectorAll('.visualization-bar');
             
-            // Update heights based on frequency data
-            // Using a simple algorithm to map frequency data to visual elements
-            // This could be made more sophisticated
-            const step = Math.floor(frequencyData.length / waveElements.length);
-            waveElements.forEach((element, index) => {
-                const frequencyValue = frequencyData[index * step];
-                const height = Math.max(5, (frequencyValue / 255) * 30);
-                element.style.height = `${height}px`;
-            });
+            if (frequencyData && bars.length > 0) {
+                // The number of frequency bins may be different than the number of bars
+                // so we need to sample the frequency data
+                const step = Math.floor(frequencyData.length / bars.length);
+                
+                // Scale the visualization based on recording state
+                const scaleFactor = audioProcessor.isCurrentlyRecording() ? 1.0 : 0.3;
+                
+                for (let i = 0; i < bars.length; i++) {
+                    const frequencyIndex = Math.min(i * step, frequencyData.length - 1);
+                    let value = frequencyData[frequencyIndex];
+                    
+                    // Scale the value to a reasonable height (0-48px)
+                    value = value * scaleFactor * 0.5;
+                    
+                    // Add some minimum height for aesthetics
+                    const height = Math.max(5, value);
+                    
+                    bars[i].style.height = `${height}px`;
+                }
+            }
+            
+            // Continue visualization
+            requestAnimationFrame(updateVisualization);
         }
         
-        // Continue animation
-        visualizationAnimationFrame = requestAnimationFrame(visualizeAudio);
+        // Start the visualization loop
+        updateVisualization();
     }
-
+    
     /**
      * Add a user message to the conversation
      */
     function addUserMessage(text, id, timestamp) {
-        const messagesContainer = document.querySelector('.conversation-messages');
-        const formattedTime = formatTimestamp(timestamp);
-        
-        const messageElement = document.createElement('div');
-        messageElement.className = 'message user-message';
-        messageElement.id = id;
-        
-        messageElement.innerHTML = `
-            <div class="message-bubble">
-                <div class="message-content">${text}</div>
-            </div>
-            <div class="message-info">
-                <span class="message-time">${formattedTime}</span>
-                <span class="message-agent">You</span>
-            </div>
-        `;
-        
-        messagesContainer.appendChild(messageElement);
+        addMessage('user', text, id, timestamp);
         scrollToBottom();
     }
-
+    
     /**
      * Update an existing user message
      */
     function updateUserMessage(id, text) {
-        const messageElement = document.getElementById(id);
-        if (messageElement) {
-            const contentElement = messageElement.querySelector('.message-content');
-            if (contentElement) {
-                contentElement.textContent = text;
-            }
+        const messageContent = document.querySelector(`#${id} .message-content`);
+        if (messageContent) {
+            messageContent.textContent = text;
+            scrollToBottom();
         }
     }
-
+    
     /**
      * Add an AI message to the conversation
      */
     function addAIMessage(text, timestamp) {
-        const messagesContainer = document.querySelector('.conversation-messages');
-        const formattedTime = formatTimestamp(timestamp);
-        const toolData = aiTools.getCurrentToolData();
-        const agentName = toolData?.name || 'INNOVATE AI';
-        
-        const messageElement = document.createElement('div');
-        messageElement.className = 'message ai-message';
-        
-        messageElement.innerHTML = `
-            <div class="message-bubble">
-                <div class="message-content">${text}</div>
-            </div>
-            <div class="message-info">
-                <span class="message-time">${formattedTime}</span>
-                <span class="message-agent">${agentName}</span>
-            </div>
-        `;
-        
-        messagesContainer.appendChild(messageElement);
+        addMessage('assistant', text, null, timestamp);
         scrollToBottom();
     }
-
+    
     /**
      * Add a system message to the conversation
      */
     function addSystemMessage(text) {
-        const messagesContainer = document.querySelector('.conversation-messages');
-        const formattedTime = formatTimestamp(new Date());
+        const conversationContainer = document.querySelector('.conversation-container');
         
-        const messageElement = document.createElement('div');
-        messageElement.className = 'message system-message';
+        if (!conversationContainer) return;
         
-        messageElement.innerHTML = `
-            <div class="message-bubble">
-                <div class="message-content">${text}</div>
-            </div>
-            <div class="message-info">
-                <span class="message-time">${formattedTime}</span>
-                <span class="message-agent">System</span>
-            </div>
-        `;
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'message system-message';
         
-        messagesContainer.appendChild(messageElement);
+        const messageContent = document.createElement('div');
+        messageContent.className = 'message-content';
+        messageContent.textContent = text;
+        
+        messageDiv.appendChild(messageContent);
+        conversationContainer.appendChild(messageDiv);
+        
         scrollToBottom();
     }
-
+    
+    /**
+     * Add a message to the conversation
+     */
+    function addMessage(role, text, id, timestamp) {
+        const conversationContainer = document.querySelector('.conversation-container');
+        
+        if (!conversationContainer) return;
+        
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${role}-message`;
+        if (id) {
+            messageDiv.id = id;
+        }
+        
+        // Create avatar and sender info
+        const messageHeader = document.createElement('div');
+        messageHeader.className = 'message-header';
+        
+        const messageAvatar = document.createElement('div');
+        messageAvatar.className = `message-avatar ${role}-avatar`;
+        messageAvatar.textContent = role === 'user' ? 'U' : 'AI';
+        
+        const messageMeta = document.createElement('div');
+        messageMeta.className = 'message-meta';
+        
+        const messageSender = document.createElement('div');
+        messageSender.className = 'message-sender';
+        messageSender.textContent = role === 'user' ? 'You' : 'INNOVATE AI';
+        
+        const messageTime = document.createElement('div');
+        messageTime.className = 'message-time';
+        messageTime.textContent = formatTimestamp(timestamp);
+        
+        messageMeta.appendChild(messageSender);
+        messageMeta.appendChild(messageTime);
+        
+        messageHeader.appendChild(messageAvatar);
+        messageHeader.appendChild(messageMeta);
+        
+        // Create message content
+        const messageContent = document.createElement('div');
+        messageContent.className = 'message-content';
+        messageContent.textContent = text;
+        
+        messageDiv.appendChild(messageHeader);
+        messageDiv.appendChild(messageContent);
+        
+        conversationContainer.appendChild(messageDiv);
+    }
+    
     /**
      * Format timestamp for display
      */
     function formatTimestamp(timestamp) {
-        const date = new Date(timestamp);
-        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        if (!timestamp) return '';
+        
+        return timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     }
-
+    
     /**
      * Scroll the conversation to the bottom
      */
     function scrollToBottom() {
-        const messagesContainer = document.querySelector('.conversation-messages');
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        const conversationContainer = document.querySelector('.conversation-container');
+        if (conversationContainer) {
+            conversationContainer.scrollTop = conversationContainer.scrollHeight;
+        }
     }
-
+    
     /**
      * Clear the conversation history
      */
     function clearConversation() {
-        // Clear conversation history
-        conversationHistory = [];
-        
-        // Clear conversation UI
-        const messagesContainer = document.querySelector('.conversation-messages');
-        messagesContainer.innerHTML = '';
-        
-        // Show initial system message
-        addSystemMessage('Conversation cleared. Start a new conversation by clicking the microphone button.');
+        const conversationContainer = document.querySelector('.conversation-container');
+        if (conversationContainer) {
+            // Remove all messages except the welcome message
+            const messages = conversationContainer.querySelectorAll('.message:not(.system-message)');
+            messages.forEach(message => message.remove());
+            
+            // Add a system message indicating conversation was cleared
+            addSystemMessage('Conversation history cleared.');
+        }
     }
 });

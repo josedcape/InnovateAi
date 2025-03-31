@@ -1,42 +1,39 @@
+"""
+Service functions for OpenAI tools (file search, vector store, etc.)
+"""
 import os
 import json
 import logging
-import tempfile
 
 # Configure logging
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Constants
+# File to store vector store ID
 VECTOR_STORE_FILE = 'vector_store_id.json'
+
 
 def get_stored_vector_store_id():
     """Retrieve stored vector store ID from file if exists"""
     try:
-        file_path = os.path.join(tempfile.gettempdir(), VECTOR_STORE_FILE)
-        
-        if os.path.exists(file_path):
-            with open(file_path, 'r') as f:
+        if os.path.exists(VECTOR_STORE_FILE):
+            with open(VECTOR_STORE_FILE, 'r') as f:
                 data = json.load(f)
                 return data.get('vector_store_id')
-        
-        return None
     except Exception as e:
-        logger.error(f"Error retrieving vector store ID: {str(e)}")
-        return None
+        logger.error(f"Error retrieving vector store ID: {e}")
+    
+    return None
+
 
 def save_vector_store_id(vector_store_id):
     """Save vector store ID to file for persistence"""
     try:
-        file_path = os.path.join(tempfile.gettempdir(), VECTOR_STORE_FILE)
-        
-        with open(file_path, 'w') as f:
+        with open(VECTOR_STORE_FILE, 'w') as f:
             json.dump({'vector_store_id': vector_store_id}, f)
-        
-        logger.debug(f"Saved vector store ID: {vector_store_id}")
-        return True
     except Exception as e:
-        logger.error(f"Error saving vector store ID: {str(e)}")
-        return False
+        logger.error(f"Error saving vector store ID: {e}")
+
 
 def upload_file_to_vector_store(client, file_path):
     """
@@ -44,150 +41,151 @@ def upload_file_to_vector_store(client, file_path):
     Returns: (file_id, vector_store_id)
     """
     try:
-        # First, upload file to OpenAI
+        # First, check if we already have a vector store ID
+        vector_store_id = get_stored_vector_store_id()
+        
+        # Upload file to OpenAI Files
         with open(file_path, 'rb') as file:
-            file_response = client.files.create(
+            file_obj = client.files.create(
                 file=file,
                 purpose="assistants"
             )
         
-        file_id = file_response.id
-        logger.debug(f"File uploaded with ID: {file_id}")
+        file_id = file_obj.id
         
-        # Get or create vector store
-        vector_store_id = get_stored_vector_store_id()
-        
+        # If we don't have a vector store ID, create a new one
         if not vector_store_id:
-            # Create a new vector store
-            vector_store_response = client.beta.vector_stores.create(
-                name="INNOVATE AI Document Store"
+            # Create a vector store for the file (vector collection)
+            vector_store = client.beta.vector_stores.create(
+                name="INNOVATE AI Document Store",
+                expires_after=30 * 24 * 60 * 60  # 30 days in seconds
             )
-            
-            vector_store_id = vector_store_response.id
-            logger.debug(f"Created new vector store with ID: {vector_store_id}")
-            
-            # Save vector store ID for future use
+            vector_store_id = vector_store.id
             save_vector_store_id(vector_store_id)
         
-        # Add file to vector store
-        file_vector_response = client.beta.vector_stores.file_batches.create(
+        # Add the file to the vector store
+        file_vector = client.beta.vector_stores.file_batches.create(
             vector_store_id=vector_store_id,
             file_ids=[file_id]
         )
         
-        batch_id = file_vector_response.id
-        logger.debug(f"Added file to vector store, batch ID: {batch_id}")
+        # Check file batch status
+        batch_id = file_vector.id
+        batch_status = client.beta.vector_stores.file_batches.retrieve(
+            vector_store_id=vector_store_id,
+            file_batch_id=batch_id
+        )
+        
+        logger.info(f"File batch status: {batch_status.status}")
         
         return file_id, vector_store_id
     except Exception as e:
-        logger.error(f"Error uploading file to vector store: {str(e)}")
-        raise
+        logger.error(f"Error uploading file to vector store: {e}")
+        raise Exception(f"Failed to upload file: {e}")
+
 
 def get_file_status_in_vector_store(client, vector_store_id, file_id):
     """Get the status of a file in the vector store"""
     try:
-        # Get file information
-        file_info = client.files.retrieve(file_id)
-        
-        # Check for batch status in vector store
-        batches = client.beta.vector_stores.file_batches.list(
+        file_batches = client.beta.vector_stores.file_batches.list(
             vector_store_id=vector_store_id
         )
         
-        for batch in batches.data:
-            # Check if this batch contains our file
-            file_ids = getattr(batch, 'file_ids', [])
-            if file_id in file_ids:
+        # Check all batches for the file
+        for batch in file_batches.data:
+            batch_info = client.beta.vector_stores.file_batches.retrieve(
+                vector_store_id=vector_store_id,
+                file_batch_id=batch.id
+            )
+            
+            if file_id in batch_info.file_ids:
                 return {
-                    'file_id': file_id,
-                    'filename': file_info.filename,
-                    'size_bytes': file_info.bytes,
-                    'created_at': file_info.created_at,
-                    'status': batch.status,
-                    'batch_id': batch.id
+                    'batch_id': batch.id,
+                    'status': batch_info.status
                 }
         
         return None
     except Exception as e:
-        logger.error(f"Error getting file status: {str(e)}")
+        logger.error(f"Error checking file status: {e}")
         return None
+
 
 def get_available_files(client, vector_store_id=None):
     """
     Get list of files available in the vector store
     """
+    if not vector_store_id:
+        vector_store_id = get_stored_vector_store_id()
+        
+    if not vector_store_id:
+        return []
+    
     try:
-        # If vector store ID not provided, get from stored value
-        if not vector_store_id:
-            vector_store_id = get_stored_vector_store_id()
-        
-        if not vector_store_id:
-            # No vector store available
-            return []
-        
-        # Get files from vector store
-        files_list = []
-        batches = client.beta.vector_stores.file_batches.list(
+        # Get all file batches from the vector store
+        file_batches = client.beta.vector_stores.file_batches.list(
             vector_store_id=vector_store_id
         )
         
-        for batch in batches.data:
-            # Only consider completed batches
-            if batch.status == 'completed':
-                # Get file IDs in this batch
-                file_ids = getattr(batch, 'file_ids', [])
-                
-                # Get file details for each file
-                for file_id in file_ids:
-                    try:
-                        file_info = client.files.retrieve(file_id)
-                        
-                        files_list.append({
-                            'file_id': file_id,
-                            'filename': file_info.filename,
-                            'size_bytes': file_info.bytes,
-                            'created_at': file_info.created_at,
-                            'batch_id': batch.id
-                        })
-                    except Exception as e:
-                        logger.warning(f"Error retrieving file {file_id}: {str(e)}")
+        file_ids = []
+        for batch in file_batches.data:
+            batch_info = client.beta.vector_stores.file_batches.retrieve(
+                vector_store_id=vector_store_id,
+                file_batch_id=batch.id
+            )
+            
+            # Only include completed files
+            if batch_info.status == "completed":
+                file_ids.extend(batch_info.file_ids)
         
-        return files_list
+        # Get file details
+        files = []
+        for file_id in file_ids:
+            try:
+                file_info = client.files.retrieve(file_id)
+                files.append({
+                    'id': file_info.id,
+                    'filename': file_info.filename,
+                    'created_at': file_info.created_at,
+                    'bytes': file_info.bytes,
+                    'status': file_info.status
+                })
+            except Exception as file_error:
+                logger.error(f"Error retrieving file {file_id}: {file_error}")
+        
+        return files
     except Exception as e:
-        logger.error(f"Error getting available files: {str(e)}")
+        logger.error(f"Error getting available files: {e}")
         return []
+
 
 def delete_file_from_vector_store(client, vector_store_id, file_id):
     """
     Delete a file from the vector store and OpenAI File API
     """
     try:
-        # First, get the batch containing this file
-        batches = client.beta.vector_stores.file_batches.list(
+        # First, remove the file from all batches in the vector store
+        file_batches = client.beta.vector_stores.file_batches.list(
             vector_store_id=vector_store_id
         )
         
-        batch_id = None
-        for batch in batches.data:
-            file_ids = getattr(batch, 'file_ids', [])
-            if file_id in file_ids:
-                batch_id = batch.id
-                break
-        
-        if batch_id:
-            # Delete file from vector store
-            client.beta.vector_stores.file_batches.cancel(
+        for batch in file_batches.data:
+            batch_info = client.beta.vector_stores.file_batches.retrieve(
                 vector_store_id=vector_store_id,
-                file_batch_id=batch_id
+                file_batch_id=batch.id
             )
             
-            logger.debug(f"Cancelled batch {batch_id} in vector store")
+            if file_id in batch_info.file_ids:
+                # Remove file from batch
+                client.beta.vector_stores.file_batches.delete(
+                    vector_store_id=vector_store_id,
+                    file_batch_id=batch.id,
+                    file_ids=[file_id]
+                )
         
-        # Delete file from OpenAI Files API
+        # Now delete the file from OpenAI
         client.files.delete(file_id)
-        logger.debug(f"Deleted file {file_id} from OpenAI Files API")
         
         return True
     except Exception as e:
-        logger.error(f"Error deleting file: {str(e)}")
-        return False
+        logger.error(f"Error deleting file: {e}")
+        raise Exception(f"Failed to delete file: {e}")

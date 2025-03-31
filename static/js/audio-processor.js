@@ -6,57 +6,56 @@
 class AudioProcessor {
     constructor() {
         this.audioContext = null;
-        this.microphone = null;
-        this.recorder = null;
-        this.analyser = null;
-        this.currentRecording = null;
+        this.mediaStream = null;
+        this.mediaRecorder = null;
+        this.audioChunks = [];
         this.isRecording = false;
-        this.audioData = [];
-        this.frequencyData = null;
+        this.analyser = null;
+        this.visualizationData = null;
+        
+        // Audio playback
+        this.currentAudio = null;
     }
-
+    
     /**
      * Initialize audio context
      * @returns {Promise<boolean>} Success indicator
      */
     async initialize() {
         try {
-            // Create audio context
             this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            
+            // Set up analyser for visualization
+            this.analyser = this.audioContext.createAnalyser();
+            this.analyser.fftSize = 256;
+            this.visualizationData = new Uint8Array(this.analyser.frequencyBinCount);
+            
             return true;
         } catch (error) {
             console.error('Error initializing audio context:', error);
             return false;
         }
     }
-
+    
     /**
      * Request microphone access
      * @returns {Promise<MediaStream>} Media stream
      */
     async requestMicrophoneAccess() {
         try {
-            // Request microphone access
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+            this.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
             
-            // Create source from microphone
-            this.microphone = this.audioContext.createMediaStreamSource(stream);
+            // Connect to analyser
+            const source = this.audioContext.createMediaStreamSource(this.mediaStream);
+            source.connect(this.analyser);
             
-            // Set up analyser for visualization
-            this.analyser = this.audioContext.createAnalyser();
-            this.analyser.fftSize = 256;
-            this.frequencyData = new Uint8Array(this.analyser.frequencyBinCount);
-            
-            // Connect microphone to analyser
-            this.microphone.connect(this.analyser);
-            
-            return stream;
+            return this.mediaStream;
         } catch (error) {
             console.error('Error accessing microphone:', error);
             throw error;
         }
     }
-
+    
     /**
      * Start recording audio
      * @param {Function} onDataAvailable Callback for when data is available
@@ -67,56 +66,59 @@ class AudioProcessor {
         if (this.isRecording) {
             return;
         }
-
+        
         try {
-            if (!this.microphone) {
+            // Make sure we have microphone access
+            if (!this.mediaStream) {
                 await this.requestMicrophoneAccess();
             }
-
-            this.audioData = [];
-            this.isRecording = true;
             
-            // Set up MediaRecorder
-            const stream = this.microphone.mediaStream;
-            this.recorder = new MediaRecorder(stream);
+            // Reset audio chunks
+            this.audioChunks = [];
             
-            // Set up recorder event handlers
-            this.recorder.ondataavailable = (event) => {
+            // Set up media recorder
+            this.mediaRecorder = new MediaRecorder(this.mediaStream);
+            
+            // Add event handlers
+            this.mediaRecorder.ondataavailable = (event) => {
                 if (event.data.size > 0) {
-                    this.audioData.push(event.data);
+                    this.audioChunks.push(event.data);
                     if (onDataAvailable) {
                         onDataAvailable(event.data);
                     }
                 }
             };
             
-            this.recorder.onstop = () => {
-                this.isRecording = false;
-                const blob = new Blob(this.audioData, { type: 'audio/wav' });
+            this.mediaRecorder.onstop = () => {
+                // Create blob from chunks
+                const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm' });
+                
+                // Call complete callback
                 if (onComplete) {
-                    onComplete(blob);
+                    onComplete(audioBlob);
                 }
+                
+                this.isRecording = false;
             };
             
             // Start recording
-            this.recorder.start(100); // Collect data every 100ms
+            this.mediaRecorder.start();
+            this.isRecording = true;
         } catch (error) {
             console.error('Error starting recording:', error);
-            this.isRecording = false;
             throw error;
         }
     }
-
+    
     /**
      * Stop recording audio
      */
     stopRecording() {
-        if (this.recorder && this.isRecording) {
-            this.recorder.stop();
-            this.isRecording = false;
+        if (this.mediaRecorder && this.isRecording) {
+            this.mediaRecorder.stop();
         }
     }
-
+    
     /**
      * Get recording state
      * @returns {boolean} Whether recording is in progress
@@ -124,19 +126,19 @@ class AudioProcessor {
     isCurrentlyRecording() {
         return this.isRecording;
     }
-
+    
     /**
      * Get audio frequency data for visualization
      * @returns {Uint8Array|null} Frequency data or null if not available
      */
     getFrequencyData() {
-        if (this.analyser && this.frequencyData) {
-            this.analyser.getByteFrequencyData(this.frequencyData);
-            return this.frequencyData;
+        if (this.analyser && this.visualizationData) {
+            this.analyser.getByteFrequencyData(this.visualizationData);
+            return this.visualizationData;
         }
         return null;
     }
-
+    
     /**
      * Play audio from a URL
      * @param {string} audioUrl URL of the audio to play
@@ -145,43 +147,57 @@ class AudioProcessor {
      * @returns {HTMLAudioElement} Audio element
      */
     playAudio(audioUrl, onPlay, onEnd) {
-        const audio = new Audio(audioUrl);
+        // Stop any current playback
+        if (this.currentAudio) {
+            this.currentAudio.pause();
+            this.currentAudio.currentTime = 0;
+        }
         
-        // Set event listeners
-        audio.addEventListener('play', () => {
-            if (onPlay) onPlay();
+        // Create new audio element
+        this.currentAudio = new Audio(audioUrl);
+        
+        // Add event listeners
+        if (onPlay) {
+            this.currentAudio.addEventListener('play', onPlay);
+        }
+        
+        if (onEnd) {
+            this.currentAudio.addEventListener('ended', onEnd);
+        }
+        
+        // Start playback
+        this.currentAudio.play().catch(error => {
+            console.error('Error playing audio:', error);
         });
         
-        audio.addEventListener('ended', () => {
-            if (onEnd) onEnd();
-        });
-        
-        // Play the audio
-        audio.play()
-            .catch(error => console.error('Error playing audio:', error));
-        
-        return audio;
+        return this.currentAudio;
     }
-
+    
     /**
      * Clean up resources
      */
     cleanup() {
-        // Stop recording if active
-        if (this.isRecording) {
-            this.stopRecording();
+        // Stop any ongoing recording
+        if (this.mediaRecorder && this.isRecording) {
+            this.mediaRecorder.stop();
         }
         
-        // Disconnect microphone
-        if (this.microphone) {
-            this.microphone.disconnect();
-            this.microphone = null;
+        // Stop any ongoing playback
+        if (this.currentAudio) {
+            this.currentAudio.pause();
+            this.currentAudio = null;
+        }
+        
+        // Release microphone
+        if (this.mediaStream) {
+            this.mediaStream.getTracks().forEach(track => track.stop());
+            this.mediaStream = null;
         }
         
         // Close audio context
         if (this.audioContext) {
-            this.audioContext.close()
-                .catch(error => console.error('Error closing audio context:', error));
+            this.audioContext.close().catch(e => console.error(e));
+            this.audioContext = null;
         }
     }
 }

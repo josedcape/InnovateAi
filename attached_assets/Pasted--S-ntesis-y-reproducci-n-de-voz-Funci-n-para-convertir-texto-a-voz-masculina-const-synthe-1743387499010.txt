@@ -1,0 +1,64 @@
+// Síntesis y reproducción de voz
+
+// Función para convertir texto a voz (masculina)
+const synthesizeSpeechMale = async (text) => {
+    const request = {
+        input: { text },
+        voice: { languageCode: 'es-ES', ssmlGender: 'MALE' },
+        audioConfig: { audioEncoding: 'MP3' },
+    };
+    try {
+        const [response] = await ttsClient.synthesizeSpeech(request);
+        return response.audioContent.toString('base64');
+    } catch (error) {
+        console.error('Error sintetizando el texto a voz (masculina):', error);
+        throw error;
+    }
+};
+
+// Función para convertir texto a voz (femenina)
+const synthesizeSpeechFemale = async (text) => {
+    const request = {
+        input: { text },
+        voice: { languageCode: 'es-ES', ssmlGender: 'FEMALE' },
+        audioConfig: { audioEncoding: 'MP3' },
+    };
+    try {
+        const [response] = await ttsClient.synthesizeSpeech(request);
+        return response.audioContent.toString('base64');
+    } catch (error) {
+        console.error('Error sintetizando el texto a voz (femenina):', error);
+        throw error;
+    }
+};
+
+// Endpoint para voz masculina
+app.post('/synthesize-male', async (req, res) => {
+    const { text } = req.body;
+    if (!text) {
+        return res.status(400).json({ error: 'El texto es requerido para la síntesis de voz.' });
+    }
+    try {
+        const audioContent = await synthesizeSpeechMale(text);
+        res.json({ audioContent });
+    } catch (error) {
+        console.error('Error en la síntesis de voz (masculina):', error);
+        res.status(500).json({ error: 'Error en la síntesis de voz masculina.', details: error.message });
+    }
+});
+
+// Endpoint para voz femenina
+app.post('/synthesize-female', async (req, res) => {
+    const { text } = req.body;
+    if (!text) {
+        return res.status(400).json({ error: 'El texto es requerido para la síntesis de voz.' });
+    }
+    try {
+        const audioContent = await synthesizeSpeechFemale(text);
+        res.json({ audioContent });
+    } catch (error) {
+        console.error('Error en la síntesis de voz (femenina):', error);
+        res.status(500).json({ error: 'Error en la síntesis de voz femenina.', details: error.message });
+    }
+});
+

@@ -1,5 +1,7 @@
+"""
+Models for AI agents in the INNOVATE AI application
+"""
 from enum import Enum
-import os
 
 class AgentType(Enum):
     """Enum for different types of agents"""
@@ -7,6 +9,7 @@ class AgentType(Enum):
     WEB_SEARCH = "web_search"
     COMPUTER_USE = "computer_use"
     FILE_SEARCH = "file_search"
+
 
 class Agent:
     """
@@ -25,49 +28,54 @@ class Agent:
         self.name = name
         self.agent_type = agent_type
         self.description = description
-        self.icon = icon
+        self.icon = icon or f"/static/icons/{agent_type.value}-icon.svg"
     
     def to_dict(self):
         """Convert agent to dictionary for JSON serialization"""
         return {
-            "name": self.name,
-            "type": self.agent_type.value,
-            "description": self.description,
-            "icon": self.icon
+            'name': self.name,
+            'type': self.agent_type.value,
+            'description': self.description,
+            'icon': self.icon
         }
+
 
 def get_all_agents():
     """Return all available agents"""
-    agents = {
-        AgentType.DEFAULT.value: Agent(
-            name="INNOVATE AI Assistant",
+    return [
+        Agent(
+            name="Standard Assistant",
             agent_type=AgentType.DEFAULT,
-            description="General purpose AI assistant with conversation capabilities",
-            icon="/static/icons/computer-icon.svg"
+            description="General-purpose AI assistant with conversation capabilities"
         ),
-        AgentType.WEB_SEARCH.value: Agent(
-            name="Web Search Agent",
+        Agent(
+            name="Web Search Assistant",
             agent_type=AgentType.WEB_SEARCH,
-            description="Search the web for current information and provide up-to-date answers",
-            icon="/static/icons/search-icon.svg"
+            description="AI assistant that can search the web for the latest information"
         ),
-        AgentType.COMPUTER_USE.value: Agent(
-            name="Computer Use Agent",
+        Agent(
+            name="Computer Use Assistant",
             agent_type=AgentType.COMPUTER_USE,
-            description="Provide detailed guidance on using computers, software, and digital technologies",
-            icon="/static/icons/computer-icon.svg"
+            description="AI assistant that can perform tasks on your computer"
         ),
-        AgentType.FILE_SEARCH.value: Agent(
-            name="File Search Agent",
+        Agent(
+            name="File Search Assistant",
             agent_type=AgentType.FILE_SEARCH,
-            description="Search through uploaded documents to find specific information",
-            icon="/static/icons/file-icon.svg"
+            description="AI assistant that can search through your uploaded documents"
         )
-    }
-    
-    return {agent_type: agent.to_dict() for agent_type, agent in agents.items()}
+    ]
+
 
 def get_agent_by_type(agent_type):
     """Get agent by type"""
-    agents = get_all_agents()
-    return agents.get(agent_type)
+    if isinstance(agent_type, str):
+        try:
+            agent_type = AgentType(agent_type)
+        except ValueError:
+            return None
+    
+    for agent in get_all_agents():
+        if agent.agent_type == agent_type:
+            return agent
+    
+    return None

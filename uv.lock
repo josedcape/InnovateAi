@@ -608,6 +608,8 @@ dependencies = [
     { name = "openai" },
     { name = "psycopg2-binary" },
     { name = "speechrecognition" },
+    { name = "sqlalchemy" },
+    { name = "werkzeug" },
 ]
 
 [package.metadata]
@@ -620,6 +622,8 @@ requires-dist = [
     { name = "openai", specifier = ">=1.69.0" },
     { name = "psycopg2-binary", specifier = ">=2.9.10" },
     { name = "speechrecognition", specifier = ">=3.14.2" },
+    { name = "sqlalchemy", specifier = ">=2.0.40" },
+    { name = "werkzeug", specifier = ">=3.1.3" },
 ]
 
 [[package]]

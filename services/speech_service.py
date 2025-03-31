@@ -1,14 +1,22 @@
+"""
+Service functions for text-to-speech conversion
+"""
 import os
-import tempfile
 import uuid
 import logging
-from gtts import gTTS
 import requests
-import json
-import base64
+from gtts import gTTS
 
 # Configure logging
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Google Cloud API Key - Using this for enhanced TTS quality
+GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
+
+# Audio folder path
+AUDIO_FOLDER = os.path.join('uploads', 'audio')
+
 
 def get_google_tts_enhanced(text, language='en', voice='en-US-Neural2-F', speed=1.0):
     """
@@ -16,62 +24,98 @@ def get_google_tts_enhanced(text, language='en', voice='en-US-Neural2-F', speed=
     This uses the actual Google Cloud TTS API if API key is available
     Returns the path to the generated audio file
     """
+    if not GOOGLE_API_KEY:
+        logger.warning("Google API key not set. Falling back to gTTS.")
+        return None
+    
     try:
-        api_key = os.environ.get('GOOGLE_API_KEY')
-        
-        if not api_key:
-            logger.warning("No Google API key found, falling back to basic gTTS")
-            return text_to_speech_gtts(text, language)
-        
-        # Generate a unique filename
-        filename = f"tts_{uuid.uuid4().hex}.mp3"
-        temp_dir = tempfile.gettempdir()
-        output_path = os.path.join(temp_dir, filename)
-        
-        # Prepare request to Google Cloud TTS API
-        url = f"https://texttospeech.googleapis.com/v1/text:synthesize?key={api_key}"
+        url = f"https://texttospeech.googleapis.com/v1/text:synthesize?key={GOOGLE_API_KEY}"
         
         payload = {
-            "input": {"text": text},
+            "input": {
+                "text": text
+            },
             "voice": {
                 "languageCode": language,
-                "name": voice,
-                "ssmlGender": "FEMALE"
+                "name": voice
             },
             "audioConfig": {
                 "audioEncoding": "MP3",
-                "speakingRate": speed,
-                "pitch": 0.0,
-                "volumeGainDb": 0.0,
-                "effectsProfileId": ["telephony-class-application"]
+                "speakingRate": speed
             }
         }
         
-        # Make API request
+        # Map simple language codes to Google's language-region format if needed
+        if len(language) == 2:
+            if language == 'en':
+                payload["voice"]["languageCode"] = "en-US"
+            elif language == 'es':
+                payload["voice"]["languageCode"] = "es-ES"
+            elif language == 'fr':
+                payload["voice"]["languageCode"] = "fr-FR"
+            elif language == 'de':
+                payload["voice"]["languageCode"] = "de-DE"
+            elif language == 'it':
+                payload["voice"]["languageCode"] = "it-IT"
+            elif language == 'ja':
+                payload["voice"]["languageCode"] = "ja-JP"
+            elif language == 'ko':
+                payload["voice"]["languageCode"] = "ko-KR"
+            elif language == 'pt':
+                payload["voice"]["languageCode"] = "pt-BR"
+            elif language == 'ru':
+                payload["voice"]["languageCode"] = "ru-RU"
+            elif language == 'zh':
+                payload["voice"]["languageCode"] = "cmn-CN"
+        
+        # Select appropriate voice based on language
+        if payload["voice"]["languageCode"].startswith("en"):
+            payload["voice"]["name"] = "en-US-Neural2-F"
+        elif payload["voice"]["languageCode"].startswith("es"):
+            payload["voice"]["name"] = "es-ES-Neural2-F"
+        elif payload["voice"]["languageCode"].startswith("fr"):
+            payload["voice"]["name"] = "fr-FR-Neural2-F"
+        elif payload["voice"]["languageCode"].startswith("de"):
+            payload["voice"]["name"] = "de-DE-Neural2-F"
+        elif payload["voice"]["languageCode"].startswith("it"):
+            payload["voice"]["name"] = "it-IT-Neural2-F"
+        elif payload["voice"]["languageCode"].startswith("ja"):
+            payload["voice"]["name"] = "ja-JP-Neural2-F"
+        elif payload["voice"]["languageCode"].startswith("ko"):
+            payload["voice"]["name"] = "ko-KR-Neural2-F"
+        elif payload["voice"]["languageCode"].startswith("pt"):
+            payload["voice"]["name"] = "pt-BR-Neural2-F"
+        elif payload["voice"]["languageCode"].startswith("ru"):
+            payload["voice"]["name"] = "ru-RU-Neural2-F"
+        elif payload["voice"]["languageCode"].startswith("cmn"):
+            payload["voice"]["name"] = "cmn-CN-Neural2-F"
+        
         response = requests.post(url, json=payload)
         
         if response.status_code == 200:
-            # Process response
-            response_data = response.json()
-            audio_content = response_data.get('audioContent')
-            
+            audio_content = response.json().get("audioContent")
             if audio_content:
-                # Decode base64 audio content and save to file
-                with open(output_path, 'wb') as audio_file:
+                # Create a unique filename
+                filename = f"{uuid.uuid4()}.mp3"
+                file_path = os.path.join(AUDIO_FOLDER, filename)
+                
+                # Ensure the directory exists
+                os.makedirs(os.path.dirname(file_path), exist_ok=True)
+                
+                # Write audio content to file
+                import base64
+                with open(file_path, "wb") as audio_file:
                     audio_file.write(base64.b64decode(audio_content))
                 
-                logger.debug(f"Enhanced TTS audio saved to: {output_path}")
-                return output_path
-            else:
-                logger.error("No audio content in response")
-                return text_to_speech_gtts(text, language)
-        else:
-            logger.error(f"Google Cloud TTS API error: {response.status_code} - {response.text}")
-            return text_to_speech_gtts(text, language)
+                return file_path
+        
+        logger.error(f"Google TTS API error: {response.status_code} - {response.text}")
+        return None
     
     except Exception as e:
-        logger.error(f"Error in enhanced TTS: {str(e)}")
-        return text_to_speech_gtts(text, language)
+        logger.error(f"Error using Google Cloud TTS: {e}")
+        return None
+
 
 def text_to_speech_gtts(text, lang='en'):
     """
@@ -79,49 +123,35 @@ def text_to_speech_gtts(text, lang='en'):
     Returns the path to the generated audio file
     """
     try:
-        # Generate a unique filename
-        filename = f"tts_{uuid.uuid4().hex}.mp3"
-        temp_dir = tempfile.gettempdir()
-        output_path = os.path.join(temp_dir, filename)
+        # Create a unique filename
+        filename = f"{uuid.uuid4()}.mp3"
+        file_path = os.path.join(AUDIO_FOLDER, filename)
         
-        # Create gTTS object
-        tts = gTTS(text=text, lang=lang, slow=False)
+        # Ensure the directory exists
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
         
-        # Save to file
-        tts.save(output_path)
+        # Generate speech using gTTS
+        tts = gTTS(text=text, lang=lang)
+        tts.save(file_path)
         
-        logger.debug(f"Basic TTS audio saved to: {output_path}")
-        return output_path
+        return file_path
     
     except Exception as e:
-        logger.error(f"Error in basic TTS: {str(e)}")
-        raise
+        logger.error(f"Error using gTTS: {e}")
+        raise Exception(f"Failed to convert text to speech: {e}")
+
 
 def text_to_speech(text, language='en', voice=None):
     """
     Main entry point for text-to-speech conversion
     Tries enhanced Google Cloud TTS first, falls back to gTTS
     """
-    try:
-        # Default voice based on language
-        if not voice:
-            if language.startswith('en'):
-                voice = 'en-US-Neural2-F'
-            elif language.startswith('es'):
-                voice = 'es-US-Neural2-B'
-            elif language.startswith('fr'):
-                voice = 'fr-FR-Neural2-A'
-            elif language.startswith('de'):
-                voice = 'de-DE-Neural2-B'
-            elif language.startswith('ja'):
-                voice = 'ja-JP-Neural2-B'
-            else:
-                voice = 'en-US-Neural2-F'  # Default to English if language not recognized
-        
-        # Try enhanced TTS first
-        return get_google_tts_enhanced(text, language, voice)
+    # Try Google Cloud TTS first for better quality
+    voice_to_use = voice if voice else 'en-US-Neural2-F'
+    tts_file_path = get_google_tts_enhanced(text, language=language, voice=voice_to_use)
     
-    except Exception as e:
-        logger.error(f"Text-to-speech error: {str(e)}")
-        # Last resort fallback
-        return text_to_speech_gtts(text, language.split('-')[0])
+    # Fall back to gTTS if Google Cloud TTS fails
+    if not tts_file_path:
+        tts_file_path = text_to_speech_gtts(text, lang=language)
+    
+    return tts_file_path
