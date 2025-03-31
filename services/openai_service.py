@@ -127,7 +127,14 @@ def process_query_with_web_search(client, input_data, is_text=False):
                     "content": transcript
                 }
             ],
-            tools=[{"type": "web_search"}],  # Enable web search capability
+            tools=[{
+                "type": "function",
+                "function": {
+                    "name": "web_search",
+                    "description": "Search the web for information on a given query. Use this when you need to find up-to-date information."
+                }
+            }],
+            tool_choice="auto",
             temperature=0.7,
         )
         
@@ -163,7 +170,14 @@ def process_query_with_computer_use(client, input_data, is_text=False):
                     "content": transcript
                 }
             ],
-            tools=[{"type": "code_interpreter"}],  # Enable code interpreter as a substitute for computer use
+            tools=[{
+                "type": "function",
+                "function": {
+                    "name": "code_interpreter",
+                    "description": "Execute code or analyze data. Use this to help users with computational tasks."
+                }
+            }],
+            tool_choice="auto",
             temperature=0.7,
         )
         
@@ -201,7 +215,32 @@ def process_query_with_file_search(client, input_data, vector_store_id=None, is_
                     "content": transcript
                 }
             ],
-            tools=[{"type": "file_search", "file_search": {"vector_store_ids": [vector_store_id]}}],
+            tools=[{
+                "type": "function",
+                "function": {
+                    "name": "file_search",
+                    "description": "Search through uploaded files to find relevant information.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "vector_store_ids": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                },
+                                "description": "The IDs of the vector stores to search through."
+                            }
+                        },
+                        "required": ["vector_store_ids"]
+                    }
+                }
+            }],
+            tool_choice={
+                "type": "function",
+                "function": {
+                    "name": "file_search"
+                }
+            },
             temperature=0.7,
         )
         
