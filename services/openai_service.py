@@ -123,9 +123,19 @@ def process_query_with_web_search(client, input_data, is_text=False):
         # Process using the new web search model
         try:
             # Try using the new gpt-4o-search-preview model which has integrated web search
+            # Based on official OpenAI API docs, we need to use it this way
             response = client.chat.completions.create(
                 model="gpt-4o-search-preview",
-                web_search_options={},  # Enable web search
+                web_search_options={
+                    "user_location": {
+                        "type": "approximate",
+                        "approximate": {
+                            "country": "ES",
+                            "city": "Madrid",
+                            "region": "Madrid",
+                        }
+                    }
+                },
                 messages=[
                     {
                         "role": "system",
@@ -136,11 +146,10 @@ def process_query_with_web_search(client, input_data, is_text=False):
                     },
                     {
                         "role": "user",
-                        "content": transcript
+                        "content": f"Busca información actualizada sobre: {transcript}"
                     }
                 ],
-                temperature=0.7,
-                max_tokens=800,
+                # No se utiliza temperature aquí porque el modelo gpt-4o-search-preview no lo soporta
             )
             
             # Handle empty response
@@ -215,6 +224,9 @@ def process_query_with_web_search(client, input_data, is_text=False):
             
     except Exception as e:
         logger.error(f"Error processing query with web search: {e}")
+        # Si transcript no está definido en este punto, es por un error muy temprano
+        if 'transcript' not in locals():
+            transcript = "Error de procesamiento"
         return transcript, "Lo siento, hubo un problema con la búsqueda web. Por favor intenta nuevamente con una consulta diferente."
 
 

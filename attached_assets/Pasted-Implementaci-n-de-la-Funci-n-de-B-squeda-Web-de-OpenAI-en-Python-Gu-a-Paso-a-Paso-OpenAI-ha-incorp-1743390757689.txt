@@ -1,0 +1,178 @@
+Implementación de la Función de Búsqueda Web de OpenAI en Python: Guía Paso a Paso
+OpenAI ha incorporado recientemente capacidades de búsqueda web a sus modelos de IA, permitiendo obtener información actualizada en tiempo real sin depender de herramientas externas. Esta funcionalidad está disponible para los modelos gpt-4o y gpt-4o-mini. A continuación, se presenta una guía detallada para implementar esta función en aplicaciones Python.
+
+Requisitos Previos
+Crear una cuenta en la plataforma OpenAI
+Antes de comenzar con la implementación, es necesario tener una cuenta en la plataforma de OpenAI:
+
+Visite la plataforma de OpenAI y complete el proceso de registro
+
+Tras registrarse correctamente, accederá al panel principal de la plataforma3
+
+Obtener la clave de API
+La clave de API es esencial para autenticar sus solicitudes:
+
+Diríjase a la sección de claves de API en su cuenta de OpenAI
+
+Genere una nueva clave de API
+
+Guarde esta clave en un lugar seguro, ya que no podrá visualizarla nuevamente (aunque siempre puede generar nuevas claves si es necesario)3
+
+Instalar la biblioteca Python de OpenAI
+Para interactuar con la API de OpenAI desde Python, instale la biblioteca oficial:
+
+bash
+pip install openai
+Esta biblioteca proporciona todos los métodos necesarios para comunicarse con los diferentes servicios de OpenAI3.
+
+Implementación Básica de la Búsqueda Web
+Configuración del cliente OpenAI
+El primer paso consiste en inicializar el cliente de OpenAI con su clave API:
+
+python
+from openai import OpenAI
+
+# Inicializar el cliente con su clave API
+client = OpenAI()  # Por defecto toma la clave del entorno OPENAI_API_KEY
+Alternativamente, puede proporcionar la clave directamente:
+
+python
+client = OpenAI(api_key="su-clave-api-aquí")
+Realizar una búsqueda web con Chat Completions API
+Para implementar la búsqueda web, debe utilizar uno de los modelos específicos habilitados para esta función:
+
+python
+completion = client.chat.completions.create(
+    model="gpt-4o-search-preview",  # También puede usar "gpt-4o-mini-search-preview"
+    web_search_options={},
+    messages=[{
+        "role": "user",
+        "content": "¿Cuáles son las noticias positivas de hoy?"
+    }]
+)
+
+# Imprimir la respuesta del modelo
+print(completion.choices[0].message.content)
+Este código realiza una solicitud al modelo habilitado para búsqueda web, el cual automáticamente buscará información relevante en Internet antes de generar una respuesta4.
+
+Gestionar resultados y citas
+La respuesta incluirá el contenido generado por el modelo junto con citas a las fuentes utilizadas:
+
+python
+# Obtener el contenido de la respuesta (incluye citas en línea)
+response_content = completion.choices[0].message.content
+
+# Obtener las anotaciones con las URLs citadas
+annotations = completion.choices[0].message.annotations
+
+# Procesar las anotaciones (URLs citadas)
+for annotation in annotations:
+    if annotation.type == "url_citation":
+        url = annotation.url_citation.url
+        title = annotation.url_citation.title
+        start_idx = annotation.url_citation.start_index
+        end_idx = annotation.url_citation.end_index
+        print(f"Cita: {title} - {url}")
+Las anotaciones contienen información detallada sobre las fuentes utilizadas, incluyendo la URL, el título y las posiciones exactas en el texto donde se utilizó cada fuente4.
+
+Opciones Avanzadas
+Configurar la ubicación del usuario
+Para mejorar la relevancia de los resultados basados en la ubicación geográfica, puede especificar la ubicación aproximada del usuario:
+
+python
+completion = client.chat.completions.create(
+    model="gpt-4o-search-preview",
+    web_search_options={
+        "user_location": {
+            "type": "approximate",
+            "approximate": {
+                "country": "ES",  # Código de país ISO de dos letras
+                "city": "Madrid",
+                "region": "Madrid",
+                # Opcionalmente puede incluir "timezone"
+            }
+        }
+    },
+    messages=[{
+        "role": "user",
+        "content": "¿Cuáles son los eventos locales este fin de semana?"
+    }]
+)
+Esta configuración permite obtener resultados más relevantes según la ubicación especificada4.
+
+Uso completo con Python
+Este es un ejemplo completo que incorpora todas las características mencionadas:
+
+python
+from openai import OpenAI
+
+# Inicializar el cliente
+client = OpenAI()
+
+# Realizar la consulta con búsqueda web
+completion = client.chat.completions.create(
+    model="gpt-4o-search-preview",
+    web_search_options={
+        "user_location": {
+            "type": "approximate",
+            "approximate": {
+                "country": "ES",
+                "city": "Barcelona",
+                "region": "Cataluña",
+            }
+        }
+    },
+    messages=[{
+        "role": "user",
+        "content": "¿Cuáles son las últimas novedades tecnológicas?"
+    }]
+)
+
+# Imprimir la respuesta
+print("Respuesta del modelo:")
+print(completion.choices[0].message.content)
+print("\nFuentes citadas:")
+
+# Procesar y mostrar las anotaciones
+for annotation in completion.choices[0].message.annotations:
+    if annotation.type == "url_citation":
+        citation = annotation.url_citation
+        print(f"- {citation.title}: {citation.url}")
+Este código configura el cliente, realiza una consulta con búsqueda web especificando una ubicación, y luego procesa tanto la respuesta como las fuentes citadas14.
+
+Alternativa: Uso de la API de Responses
+OpenAI también ofrece la API de Responses, que permite que los modelos invoquen la herramienta de búsqueda web solo cuando sea necesario:
+
+python
+from openai import OpenAI
+
+client = OpenAI()
+
+response = client.responses.create(
+    model="gpt-4o",  # Aquí se usa gpt-4o estándar
+    tools=[{"type": "web_search_preview"}],
+    query="¿Cuál es el último avance en computación cuántica?"
+)
+
+# Obtener el texto de la respuesta
+print(response.output.text)
+
+# Obtener anotaciones (citas)
+for annotation in response.annotations:
+    if annotation.type == "url_citation":
+        print(f"Fuente: {annotation.url_citation.url}")
+Esta alternativa es útil cuando desea que el modelo utilice la búsqueda web solo cuando lo considere necesario, en lugar de hacerlo para cada consulta1.
+
+Consideraciones de Precio y Disponibilidad
+Al implementar esta función, tenga en cuenta:
+
+Los precios varían según el modelo utilizado: para gpt-4o-mini-search el costo es de 15 centavos por millón de tokens de entrada y 60 centavos por millón de tokens de salida, mientras que gpt-4o-search tiene un costo más elevado1.
+
+La disponibilidad varía según la suscripción: actualmente, SearchGPT (la versión de ChatGPT con búsqueda web) está disponible para suscriptores de Plus y Teams, con planes de expandirse a todos los usuarios en los próximos meses2.
+
+Conclusión
+La integración de la función de búsqueda web de OpenAI en aplicaciones Python proporciona una poderosa capacidad para acceder a información actualizada y en tiempo real. Siguiendo los pasos descritos en esta guía, puede implementar fácilmente esta funcionalidad en sus propios proyectos.
+
+La principal ventaja de esta característica es permitir que los modelos de IA accedan a información actual sin depender de herramientas externas, simplificando la arquitectura de las aplicaciones y mejorando la experiencia del usuario. Esto resulta especialmente útil para casos de uso como asistentes virtuales, herramientas de investigación y aplicaciones que requieren datos actualizados.
+
+A medida que OpenAI continúa desarrollando y expandiendo estas capacidades, es recomendable consultar la documentación oficial para obtener las últimas actualizaciones y mejores prácticas.

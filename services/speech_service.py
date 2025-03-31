@@ -255,25 +255,58 @@ def text_to_speech(text, language='en', voice=None):
     """
     Main entry point for text-to-speech conversion
     Tries different TTS methods in order of preference:
-    1. Google Cloud TTS client (using credentials file)
-    2. Google Cloud TTS REST API (using API key)
-    3. gTTS (fallback)
+    We're starting with gTTS since we're having issues with Google Cloud
+    1. gTTS (primary method for now)
+    2. Google Cloud TTS client (using credentials file)
+    3. Google Cloud TTS REST API (using API key)
     """
     # Check if text is empty or None
     if not text or text.strip() == '':
         logger.error("Empty text provided to text_to_speech")
         text = "Lo siento, hubo un problema al generar una respuesta."
     
-    # Try Google Cloud TTS client first (credentials-based)
-    tts_file_path = get_google_cloud_tts(text, language=language, voice=voice)
+    # Start with gTTS because we're having issues with Google Cloud TTS
+    try:
+        logger.info(f"Converting text to speech using gTTS: {text[:50]}...")
+        tts_file_path = text_to_speech_gtts(text, lang=language)
+        if tts_file_path:
+            return tts_file_path
+    except Exception as e:
+        logger.warning(f"Could not use gTTS: {e}")
+    
+    # If gTTS fails, try Google Cloud options
+    tts_file_path = None
+    
+    # Try Google Cloud TTS client (credentials-based)
+    try:
+        tts_file_path = get_google_cloud_tts(text, language=language, voice=voice)
+        if tts_file_path:
+            return tts_file_path
+    except Exception as e:
+        logger.warning(f"Could not use Google Cloud TTS client: {e}")
     
     # If that fails, try the REST API with API key
-    if not tts_file_path and GOOGLE_API_KEY:
-        voice_to_use = voice if voice else 'en-US-Neural2-F'
-        tts_file_path = get_google_tts_enhanced(text, language=language, voice=voice_to_use)
+    if GOOGLE_API_KEY:
+        try:
+            voice_to_use = voice if voice else 'en-US-Neural2-F'
+            tts_file_path = get_google_tts_enhanced(text, language=language, voice=voice_to_use)
+            if tts_file_path:
+                return tts_file_path
+        except Exception as e:
+            logger.warning(f"Could not use Google TTS API: {e}")
     
-    # Fall back to gTTS if all Google methods fail
-    if not tts_file_path:
-        tts_file_path = text_to_speech_gtts(text, lang=language)
+    # If we got here, all methods failed - create a static message
+    logger.error("All TTS methods failed")
     
-    return tts_file_path
+    # Create a static error audio file if none exists
+    error_path = os.path.join(AUDIO_FOLDER, "error_message.mp3")
+    if not os.path.exists(error_path):
+        try:
+            os.makedirs(os.path.dirname(error_path), exist_ok=True)
+            error_tts = gTTS(text="Lo siento, hubo un problema con la síntesis de voz.", lang="es")
+            error_tts.save(error_path)
+        except:
+            # If even this fails, we'll return None and let the caller handle it
+            return None
+    
+    return error_path
