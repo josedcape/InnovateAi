@@ -1,14 +1,15 @@
-modules = ["python-3.11", "python3"]
+modules = ["python-3.11", "nodejs-20", "web", "bash"]
+run = "python main.py"
 
 [nix]
 channel = "stable-24_05"
 
 [deployment]
 deploymentTarget = "autoscale"
-run = ["gunicorn", "--bind", "0.0.0.0:5000", "main:app"]
+run = ["sh", "-c", "python main.py"]
 
 [workflows]
-runButton = "Project"
+runButton = "Run Python"
 
 [[workflows.workflow]]
 name = "Project"
@@ -33,6 +34,15 @@ task = "packager.installForAll"
 task = "shell.exec"
 args = "gunicorn --bind 0.0.0.0:5000 --reuse-port --reload main:app"
 waitForPort = 5000
+
+[[workflows.workflow]]
+name = "Run Python"
+author = 41043915
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python main.py"
 
 [[ports]]
 localPort = 5000
